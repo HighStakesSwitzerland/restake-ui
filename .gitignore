@@ -4,6 +4,7 @@ src/networks.local.json
 /node_modules
 /.pnp
 .pnp.js
+*.iml
 
 # testing
 /coverage
