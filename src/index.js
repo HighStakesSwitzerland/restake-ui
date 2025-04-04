@@ -23,6 +23,7 @@ const app = (
         <Route path="/:network/vote" element={<NetworkFinder />} />
         <Route path="/:network/vote/:proposalId" element={<NetworkFinder />} />
         <Route path="/:network/grant" element={<NetworkFinder />} />
+        <Route path="/:network/swap" element={<NetworkFinder />} />
         <Route path="/:network/:validator" element={<NetworkFinder />} />
         <Route path="/:network/:validator/:section" element={<NetworkFinder />} />
       </Routes>
@@ -40,10 +41,10 @@ if (process.env.BUGSNAG_KEY) {
     enabledReleaseStages: ['production', 'staging'],
     releaseStage: process.env.NODE_ENV
   })
-  
+
   const ErrorBoundary = Bugsnag.getPlugin('react')
     .createErrorBoundary(React)
-  
+
   root.render(
     <ErrorBoundary>
       {app}

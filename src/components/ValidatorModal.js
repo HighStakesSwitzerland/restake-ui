@@ -15,6 +15,7 @@ import {
 
 import ValidatorStake from './ValidatorStake';
 import ValidatorProfile from './ValidatorProfile';
+import ValidatorCalculator from './ValidatorCalculator';
 
 function ValidatorModal(props) {
   const { validator, delegations, operators, network, validators, grants } = props
@@ -30,9 +31,12 @@ function ValidatorModal(props) {
   }
 
   useEffect(() => {
-    setRegistryData()
     setLastExec()
   }, [validator]);
+
+  useEffect(() => {
+    setRegistryData()
+  }, [validator?.path]);
 
   useEffect(() => {
     if(registryData == null){
@@ -78,7 +82,7 @@ function ValidatorModal(props) {
       setTab('profile')
     }
   }, [props.show])
-  
+
   function setTab(tab){
     setActiveTab(tab || 'profile')
   }
@@ -103,17 +107,24 @@ function ValidatorModal(props) {
       return
     }
 
-    network.queryClient.getTransactions([
-      { key: 'events', value: `message.action='/cosmos.authz.v1beta1.MsgExec'` },
-      { key: 'events', value: `message.sender='${operator.botAddress}'` }
+    const key = network.chain.sdk50OrLater ? 'query' : 'events'
+
+    network.restClient.getTransactions([
+      // { key: key, value: `message.action='/cosmos.authz.v1beta1.MsgExec'` },
+      { key: key, value: `message.sender='${operator.botAddress}'` }
     ], {
-      pageSize: 1,
+      pageSize: 3,
       order: 2,
       retries: 3,
       timeout: 15_000
     }).then(data => {
       if (data.tx_responses?.length > 0) {
-        setLastExec(moment(data.tx_responses[0].timestamp))
+        const lastExecResponse = data.tx_responses.find(tx => tx.tx.body.messages[0]['@type'] === '/cosmos.authz.v1beta1.MsgExec')
+        if(lastExecResponse){
+          setLastExec(moment(lastExecResponse.timestamp))
+        }else{
+          setLastExec(false)
+        }
       } else if(emptyResponseRetries && lastExec == null) {
         getLastExec(emptyResponseRetries - 1)
       } else if(lastExec == null) {
@@ -142,6 +153,9 @@ function ValidatorModal(props) {
                 </Nav.Item>
                 <Nav.Item>
                   <Nav.Link role="button" eventKey="stake">Stake</Nav.Link>
+                </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link role="button" eventKey="calculator">Calculator</Nav.Link>
                 </Nav.Item>
                 {network.authzSupport && !network.authzAminoSupport && operator && (
                   <Nav.Item className="d-none d-md-flex">
@@ -179,12 +193,19 @@ function ValidatorModal(props) {
                     validatorApy={props.validatorApy}
                     authzSupport={props.authzSupport}
                     restakePossible={props.restakePossible}
-                    signingClient={props.signingClient}
                     isLoading={props.isLoading}
                     onDelegate={props.onDelegate}
                     onClaimRewards={props.onClaimRewards}
                     onGrant={props.onGrant}
                     onRevoke={props.onRevoke}
+                  />
+                </Tab.Pane>
+                <Tab.Pane eventKey="calculator">
+                  <ValidatorCalculator
+                    network={network}
+                    validator={validator}
+                    operator={operator}
+                    delegation={delegations && delegations[validator.address]}
                   />
                 </Tab.Pane>
                 {network.authzSupport && !network.authzAminoSupport && operator && (

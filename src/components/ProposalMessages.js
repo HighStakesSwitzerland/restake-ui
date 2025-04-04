@@ -5,6 +5,8 @@ import {
 import moment from 'moment'
 import _ from 'lodash'
 import Moment from 'react-moment';
+import truncateMiddle from 'truncate-middle';
+import { omit } from '../utils/Helpers.mjs';
 import Coins from './Coins';
 
 function ProposalMessages(props) {
@@ -27,7 +29,7 @@ function ProposalMessages(props) {
   }
 
   function messageData(message){
-    const data = _.omit(message, 'title', 'name', '@type', 'description')
+    const data = omit(message, 'title', 'name', '@type', 'description')
     switch (message['@type']) {
       case [
         '/cosmos.upgrade.v1beta1.SoftwareUpgradeProposal',
@@ -44,13 +46,14 @@ function ProposalMessages(props) {
             )
           }
         }
-      case '/cosmos.distribution.v1beta1.CommunityPoolSpendProposal':
+      case [
+        '/cosmos.distribution.v1beta1.CommunityPoolSpendProposal',
+        '/cosmos.distribution.v1beta1.MsgCommunityPoolSpend'
+      ].find(type => type === message['@type']):
         return {
           ...data,
           amount: () => {
-            return data.amount?.map((coin, index) => {
-              return <Coins key={index} coins={coin} asset={network.assetForDenom(coin.denom)} fullPrecision={true} />
-            })
+            return <Coins coins={data.amount} network={network} showTotalValue={false} />
           }
         }
       default:
@@ -59,6 +62,8 @@ function ProposalMessages(props) {
             return <pre className="pre-wrap">{JSON.stringify(value, undefined, 2)}</pre>
           }else if(typeof value == "boolean"){
             return value ? 'true' : 'false'
+          }else if(typeof value == "string"){
+            return truncateMiddle(value, 100, 100, '…')
           }else{
             return value
           }
