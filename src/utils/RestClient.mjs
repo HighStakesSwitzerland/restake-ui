@@ -201,7 +201,7 @@ const RestClient = async (chainId, restUrls, opts) => {
 
   function getWithdrawAddress(address, opts) {
     return client
-      .get(apiPath('distribution', `delegators/${address}/withdraw_address`))
+      .get(apiPath('distribution', `delegators/${address}/withdraw_address`), opts)
       .then((res) => res.data)
       .then((result) => {
         return result.withdraw_address;
@@ -329,7 +329,7 @@ const RestClient = async (chainId, restUrls, opts) => {
       },
       (error) => {
         clearTimeout(txPollTimeout);
-        return error
+        throw error
       },
     )
   }

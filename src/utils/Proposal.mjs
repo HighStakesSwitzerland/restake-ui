@@ -18,32 +18,71 @@ export const PROPOSAL_SCAM_URLS = [
   'cosmoweb.at'
 ]
 
+function getSafeMetadataUrl(metadata) {
+  if (!metadata || typeof metadata !== 'string') return null
+  if (metadata.startsWith('ipfs://') && metadata !== 'ipfs://CID') {
+    return metadata.replace('ipfs://', 'https://ipfs.io/ipfs/')
+  }
+  if (metadata.startsWith('https://')) {
+    try {
+      const parsed = new URL(metadata)
+      if (parsed.protocol !== 'https:') return null
+      const hostname = parsed.hostname.toLowerCase()
+      if (
+        !hostname ||
+        hostname === 'localhost' ||
+        hostname.endsWith('.localhost') ||
+        hostname === '0.0.0.0' ||
+        hostname === '[::1]' ||
+        hostname === '::1' ||
+        hostname.startsWith('127.') ||
+        hostname.startsWith('10.') ||
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('169.254.') ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+      ) {
+        return null
+      }
+      return parsed.href
+    } catch {
+      return null
+    }
+  }
+  if (isIPFSCID(metadata)) {
+    return `https://ipfs.io/ipfs/${metadata}`
+  }
+  return null
+}
+
 const Proposal = async (data) => {
   let { proposal_id, content, messages, metadata, title, summary: description } = data
   if(!proposal_id && data.id) proposal_id = data.id
+  if(typeof title !== 'string') title = undefined
+  if(typeof description !== 'string') description = undefined
 
   let typeHuman
   if(metadata){
     try {
-      metadata = JSON.parse(metadata)
-      title = title || metadata.title
-      description = description || metadata.summary
+      const parsedMetadata = JSON.parse(metadata)
+      if (parsedMetadata && typeof parsedMetadata === 'object') {
+        metadata = parsedMetadata
+        if (!title && typeof metadata.title === 'string') title = metadata.title
+        if (!description && typeof metadata.summary === 'string') description = metadata.summary
+      }
     } catch {
       try {
-        let ipfsUrl
-        if(metadata.startsWith('ipfs://') && metadata !== 'ipfs://CID'){
-          ipfsUrl = metadata.replace("ipfs://", "https://ipfs.io/ipfs/")
-        }else if(metadata.startsWith('https://')){
-          ipfsUrl = metadata
-        }else if(isIPFSCID(metadata)){
-          ipfsUrl = `https://ipfs.io/ipfs/${metadata}`
-        }
+        const ipfsUrl = getSafeMetadataUrl(metadata)
         if(ipfsUrl) {
-          let response = await axios.get(ipfsUrl, { timeout: 5000 })
-          if(response.headers['content-type'] === 'application/json'){
+          let response = await axios.get(ipfsUrl, {
+            timeout: 5000,
+            maxContentLength: 1024 * 1024,
+            maxBodyLength: 1024 * 1024
+          })
+          if(response.headers['content-type']?.includes('application/json') && response.data && typeof response.data === 'object'){
             metadata = response.data
-            title = metadata.title
-            description = metadata.summary || metadata.description || metadata.details
+            if (typeof metadata.title === 'string') title = metadata.title
+            const remoteDescription = metadata.summary || metadata.description || metadata.details
+            if (typeof remoteDescription === 'string') description = remoteDescription
           }
         }
       } catch (e) {
@@ -59,19 +98,19 @@ const Proposal = async (data) => {
   }
 
   if(content){
-    title = title || content.title
-    description = description || content.description
+    if (!title && typeof content.title === 'string') title = content.title
+    if (!description && typeof content.description === 'string') description = content.description
     typeHuman = typeHuman || (content['@type'] ? content['@type'].split('.').reverse()[0] : 'Unknown')
   }
 
   title = title || typeHuman
-  description = description || metadata
+  if (!description && typeof metadata === 'string') description = metadata
 
   const statusHuman = PROPOSAL_STATUSES[data.status]
 
   const isDeposit = data.status === 'PROPOSAL_STATUS_DEPOSIT_PERIOD'
   const isVoting = data.status === 'PROPOSAL_STATUS_VOTING_PERIOD'
-  const isSpam = PROPOSAL_SCAM_URLS.some(url => description && description.toLowerCase().includes(url))
+  const isSpam = typeof description === 'string' && PROPOSAL_SCAM_URLS.some(url => description.toLowerCase().includes(url))
 
   return {
     ...data,

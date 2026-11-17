@@ -9,13 +9,90 @@ import AboutLedger from "./AboutLedger";
 import {
   Button,
   Dropdown,
-  Spinner,
-  Dropdown,
- } from "react-bootstrap";
+} from "react-bootstrap";
 import { Gear } from "react-bootstrap-icons";
 
 import { authzSupportMessage, parseGrants, rewardAmount } from "../utils/Helpers.mjs";
+import Coin from "./Coin";
 import Validators from "./Validators";
+
+function filterDelegationsByValidators(delegations, validators) {
+  const orderedAddresses = Object.keys(validators);
+  return orderedAddresses.reduce((sum, address) => {
+    if (delegations[address] && delegations[address].balance.amount !== '0') {
+      sum[address] = delegations[address];
+    }
+    return sum;
+  }, {});
+}
+
+function reduceRewardsByValidator(rewards) {
+  return rewards.reduce((sum, reward) => {
+    const validatorRewards = reward.reward.filter(el => largerEq(el.amount, 1));
+    if (validatorRewards.length > 0) {
+      sum[reward.validator_address] = {
+        validator_address: reward.validator_address,
+        reward: validatorRewards
+      };
+    }
+    return sum;
+  }, {});
+}
+
+function buildGrantData(grants, grantee, granter, validators) {
+  const { claimGrant, stakeGrant } = parseGrants(grants, grantee, granter);
+  let grantValidators, maxTokens;
+  if (stakeGrant) {
+    const { allow_list, deny_list, max_tokens } = stakeGrant.authorization;
+    if (allow_list?.address) {
+      grantValidators = allow_list.address;
+    } else if (deny_list?.address) {
+      grantValidators = deny_list.address.includes('')
+        ? []
+        : Object.values(validators).map(el => el.address).filter(address => !deny_list.address.includes(address));
+    }
+    maxTokens = max_tokens;
+  }
+  return {
+    claimGrant,
+    stakeGrant,
+    validators: grantValidators,
+    maxTokens: maxTokens ? bignumber(maxTokens.amount) : null
+  };
+}
+
+function resolveOperatorGrants(operators, operatorGrants, rewards, denom, defaultGrant) {
+  if (!operatorGrants) return {};
+  return operators.reduce((sum, operator) => {
+    const grant = operatorGrants[operator.botAddress] || defaultGrant;
+    sum[operator.botAddress] = {
+      ...grant,
+      grantsValid: !!(
+        grant.stakeGrant &&
+        (!grant.validators || grant.validators.includes(operator.address)) &&
+        (grant.maxTokens === null || larger(grant.maxTokens, rewardAmount(rewards?.[operator.address], denom)))
+      ),
+      grantsExist: !!(grant.claimGrant || grant.stakeGrant),
+    };
+    return sum;
+  }, {});
+}
+
+function sumRewardsForValidators(rewards, denom, validators) {
+  if (!rewards) return;
+
+  const total = Object.values(rewards).reduce((sum, item) => {
+    const reward = item.reward.find((el) => el.denom === denom);
+    if (reward && (validators === undefined || validators.includes(item.validator_address))) {
+      return add(sum, reward.amount);
+    }
+    return sum;
+  }, 0);
+  return {
+    amount: total,
+    denom: denom,
+  };
+}
 
 class Delegations extends React.Component {
   constructor(props) {
@@ -112,13 +189,7 @@ class Delegations extends React.Component {
     return this.restClient().getDelegations(address)
       .then(
         (delegations) => {
-          const orderedAddresses = Object.keys(this.props.validators)
-          delegations = orderedAddresses.reduce((sum, address) => {
-            if(delegations[address] && delegations[address].balance.amount !== '0'){
-              sum[address] = delegations[address]
-            }
-            return sum
-          }, {})
+          delegations = filterDelegationsByValidators(delegations, this.props.validators)
           if(address === this.props.address){
             this.setState({
               delegations: delegations,
@@ -150,16 +221,7 @@ class Delegations extends React.Component {
       .getRewards(this.props.address, this.props.network.denom)
       .then(
         (rewards) => {
-          this.setState({ rewards: rewards.reduce((sum, reward) => {
-            const validatorRewards = reward.reward.filter(reward => largerEq(reward.amount, 1))
-            if(validatorRewards.length > 0){
-              sum[reward.validator_address] = {
-                validator_address: reward.validator_address,
-                reward: validatorRewards
-              }
-            }
-            return sum
-          }, {}) });
+          this.setState({ rewards: reduceRewardsByValidator(rewards) });
         },
         (error) => {
           if ([404, 500].includes(error.response && error.response.status) && !this.state.rewards) {
@@ -212,23 +274,7 @@ class Delegations extends React.Component {
   }
 
   buildGrants(grants, grantee, granter){
-    const { claimGrant, stakeGrant } = parseGrants(grants, grantee, granter)
-    let grantValidators, maxTokens;
-    if (stakeGrant) {
-      const { allow_list, deny_list, max_tokens } = stakeGrant.authorization
-      if (allow_list?.address) {
-        grantValidators = allow_list.address
-      } else if (deny_list?.address) {
-        grantValidators = deny_list.address.includes('') ? [] : this.props.validators.map(el => el.address).filter(address => !deny_list.address.includes(address))
-      }
-      maxTokens = max_tokens
-    }
-    return {
-      claimGrant: claimGrant,
-      stakeGrant: stakeGrant,
-      validators: grantValidators,
-      maxTokens: maxTokens ? bignumber(maxTokens.amount) : null
-    };
+    return buildGrantData(grants, grantee, granter, this.props.validators);
   }
 
   isValidatorOperator(){
@@ -308,21 +354,13 @@ class Delegations extends React.Component {
   }
 
   operatorGrants() {
-    if (!this.state.operatorGrants) return {}
-    return this.props.operators.reduce((sum, operator) => {
-      let grant = this.state.operatorGrants[operator.botAddress]
-      if (!grant) grant = this.defaultGrant;
-      sum[operator.botAddress] = {
-        ...grant,
-        grantsValid: !!(
-          grant.stakeGrant &&
-          (!grant.validators || grant.validators.includes(operator.address)) &&
-          (grant.maxTokens === null || larger(grant.maxTokens, rewardAmount(this.state.rewards?.[operator.address], this.props.network.denom)))
-        ),
-        grantsExist: !!(grant.claimGrant || grant.stakeGrant),
-      }
-      return sum
-    }, {})
+    return resolveOperatorGrants(
+      this.props.operators,
+      this.state.operatorGrants,
+      this.state.rewards,
+      this.props.network.denom,
+      this.defaultGrant
+    );
   }
 
   restakePossible() {
@@ -330,20 +368,14 @@ class Delegations extends React.Component {
   }
 
   totalRewards(validators) {
-    if (!this.state.rewards) return;
+    return sumRewardsForValidators(this.state.rewards, this.props.network.denom, validators);
+  }
 
-    const denom = this.props.network.denom;
-    const total = Object.values(this.state.rewards).reduce((sum, item) => {
-      const reward = item.reward.find((el) => el.denom === denom);
-      if (reward && (validators === undefined || validators.includes(item.validator_address))) {
-        return add(sum, reward.amount)
-      }
-      return sum;
+  totalStaked() {
+    if (!this.state.delegations) return 0;
+    return Object.values(this.state.delegations).reduce((sum, delegation) => {
+      return add(sum, delegation?.balance?.amount || 0);
     }, 0);
-    return {
-      amount: total,
-      denom: denom,
-    };
   }
 
   showValidatorModal(validator, opts) {
@@ -407,13 +439,42 @@ class Delegations extends React.Component {
   render() {
     if (!this.props.validators) {
       return (
-        <div className="text-center">
-          <Spinner animation="border" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </Spinner>
+        <div aria-busy="true" aria-label="Loading validators">
+          {this.props.address && (
+            <div className="row g-3 mb-4">
+              {[0, 1, 2].map((idx) => (
+                <div key={idx} className="col-12 col-md-4">
+                  <div className="card h-100">
+                    <div className="card-body py-3">
+                      <div className="rs-skeleton mb-2" style={{ height: '0.75rem', width: '42%' }} />
+                      <div className="rs-skeleton" style={{ height: '1.5rem', width: '65%' }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="rs-table-wrapper p-3">
+            {[0, 1, 2, 3, 4].map((idx) => (
+              <div key={idx} className="d-flex align-items-center gap-3 py-2 border-bottom">
+                <div className="rs-skeleton rounded-circle flex-shrink-0" style={{ width: 30, height: 30 }} />
+                <div className="rs-skeleton flex-grow-1" style={{ height: '1.125rem' }} />
+                <div className="rs-skeleton" style={{ height: '1.125rem', width: '80px' }} />
+                <div className="rs-skeleton d-none d-sm-block" style={{ height: '1.125rem', width: '90px' }} />
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
+
+    const operatorGrants = this.operatorGrants();
+    const delegatedOperators = this.props.operators.filter(
+      (operator) => this.state.delegations?.[operator.address] && operatorGrants?.[operator.botAddress]?.grantsValid
+    );
+    const delegatedCount = Object.keys(this.state.delegations || {}).length;
+    const totalRewards = this.totalRewards();
+    const totalStaked = this.totalStaked();
 
     const alerts = (
       <>
@@ -447,9 +508,116 @@ class Delegations extends React.Component {
       </>
     );
 
+    const allRewardsDropdown = this.state.rewards && (
+      !this.state.claimLoading && !this.isLoading('rewards') ? (
+        <Dropdown>
+          <Dropdown.Toggle
+            variant="primary"
+            size="sm"
+            id="claim-dropdown"
+          >
+            All Rewards
+          </Dropdown.Toggle>
+
+          <Dropdown.Menu align="end">
+            <ClaimRewards
+              network={this.props.network}
+              address={this.props.address}
+              wallet={this.props.wallet}
+              rewards={Object.values(this.state.rewards || {})}
+              onClaimRewards={this.onClaimRewards}
+              setLoading={this.setClaimLoading}
+              setError={this.setError}
+            />
+            <ClaimRewards
+              disabled={!totalRewards?.amount}
+              restake={true}
+              network={this.props.network}
+              address={this.props.address}
+              wallet={this.props.wallet}
+              rewards={Object.values(this.state.rewards || {})}
+              onClaimRewards={this.onClaimRewards}
+              setLoading={this.setClaimLoading}
+              setError={this.setError}
+            />
+          </Dropdown.Menu>
+        </Dropdown>
+      ) : (
+        <Button variant="secondary" size="sm" disabled aria-label="Loading rewards actions">
+          <span
+            className="spinner-border spinner-border-sm"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          &nbsp;
+        </Button>
+      )
+    );
+
     return (
       <>
         {alerts}
+        {this.props.address && (
+          <div className="row g-3 mb-4" aria-label="Staking portfolio summary">
+            <div className="col-12 col-md-4">
+              <div className="card h-100">
+                <div className="card-body py-3">
+                  <div className="text-body-secondary small text-uppercase fw-semibold mb-1">Total Staked</div>
+                  {this.isLoading('delegations') ? (
+                    <div className="rs-skeleton" style={{ height: '1.5rem', width: '60%' }} />
+                  ) : (
+                    <div className="fs-5 fw-semibold tabular-nums">
+                      <Coin
+                        amount={totalStaked}
+                        denom={this.props.network.denom}
+                        asset={this.props.network.baseAsset}
+                        precision={3}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="col-12 col-md-4">
+              <div className="card h-100">
+                <div className="card-body py-3">
+                  <div className="text-body-secondary small text-uppercase fw-semibold mb-1">Pending Rewards</div>
+                  {this.isLoading('rewards') ? (
+                    <div className="rs-skeleton" style={{ height: '1.5rem', width: '55%' }} />
+                  ) : (
+                    <div className="fs-5 fw-semibold tabular-nums">
+                      <Coin
+                        amount={totalRewards?.amount || 0}
+                        denom={this.props.network.denom}
+                        asset={this.props.network.baseAsset}
+                        precision={3}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="col-12 col-md-4">
+              <div className="card h-100">
+                <div className="card-body py-3 d-flex align-items-center justify-content-between gap-2">
+                  <div>
+                    <div className="text-body-secondary small text-uppercase fw-semibold mb-1">REStake Status</div>
+                    {this.isLoading('delegations') || this.isLoading('grants') ? (
+                      <div className="rs-skeleton" style={{ height: '1.5rem', width: '110px' }} />
+                    ) : (
+                      <div className="fs-6 fw-semibold tabular-nums">
+                        {this.restakeSupport()
+                          ? `${delegatedOperators.length} / ${delegatedCount} Active`
+                          : 'Manual Only'}
+                      </div>
+                    )}
+                  </div>
+                  {allRewardsDropdown}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="mb-2">
           <Validators
             theme={this.props.theme}
@@ -462,7 +630,7 @@ class Delegations extends React.Component {
             delegations={this.state.delegations}
             rewards={this.state.rewards}
             commission={this.state.commission}
-            operatorGrants={this.operatorGrants()}
+            operatorGrants={operatorGrants}
             authzSupport={this.authzSupport()}
             restakePossible={this.restakePossible()}
             showValidator={this.showValidatorModal}
@@ -546,68 +714,16 @@ class Delegations extends React.Component {
               )
             }} />
         </div>
-        <div className="row">
-          <div className="col">
-          </div>
-          <div className="col">
-            <div className="d-grid gap-2 d-md-flex justify-content-end">
-              {this.state.rewards &&
-                (!this.state.claimLoading && !this.isLoading('rewards') ? (
-                  <Dropdown>
-                    <Dropdown.Toggle
-                      variant="secondary"
-                      id="claim-dropdown"
-                    >
-                      All Rewards
-                    </Dropdown.Toggle>
-
-                    <Dropdown.Menu>
-                      <ClaimRewards
-                        network={this.props.network}
-                        address={this.props.address}
-                        wallet={this.props.wallet}
-                        rewards={Object.values(this.state.rewards || {})}
-                        onClaimRewards={this.onClaimRewards}
-                        setLoading={this.setClaimLoading}
-                        setError={this.setError}
-                      />
-                      <ClaimRewards
-                        disabled={!this.totalRewards().amount}
-                        restake={true}
-                        network={this.props.network}
-                        address={this.props.address}
-                        wallet={this.props.wallet}
-                        rewards={Object.values(this.state.rewards || {})}
-                        onClaimRewards={this.onClaimRewards}
-                        setLoading={this.setClaimLoading}
-                        setError={this.setError}
-                      />
-                    </Dropdown.Menu>
-                  </Dropdown>
-                ) : (
-                  <Button className="btn-secondary mr-5" disabled>
-                    <span
-                      className="spinner-border spinner-border-sm"
-                      role="status"
-                      aria-hidden="true"
-                    ></span>
-                    &nbsp;
-                  </Button>
-                ))}
-            </div>
-          </div>
+        <hr className="my-4" />
+        <div className="text-center mb-5">
+          <p className="text-body-secondary mb-2">
+            Enabling REStake authorizes the validator to send <em>Delegate</em> transactions on your behalf <a href="https://docs.cosmos.network/main/modules/authz/" target="_blank" rel="noopener noreferrer" className="text-reset">using Authz</a> for their own validator only. Revoke anytime.
+          </p>
+          <p className="mb-3">
+            <strong>Validators pay the transaction fees for you.</strong>
+          </p>
+          <Button onClick={this.props.showAbout} variant="outline-secondary" size="sm">More info</Button>
         </div>
-        <hr />
-        <p className="mt-5 text-center">
-          Enabling REStake will authorize the validator to send <em>Delegate</em> transactions on your behalf <a href="https://docs.cosmos.network/main/modules/authz/" target="_blank" rel="noreferrer" className="text-reset">using Authz</a>.<br />
-          They will only be authorized to delegate to their own validator. You can revoke the authorization at any time and everything is open source.
-        </p>
-        <p className="text-center mb-4">
-          <strong>The validators will pay the transaction fees for you.</strong>
-        </p>
-        <p className="text-center mb-5">
-          <Button onClick={this.props.showAbout} variant="outline-secondary">More info</Button>
-        </p>
         {this.renderValidatorModal()}
       </>
     );

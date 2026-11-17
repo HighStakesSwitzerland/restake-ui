@@ -12,7 +12,7 @@ import {
 } from 'react-bootstrap'
 
 import AlertMessage from './AlertMessage';
-import { coin, execableMessage, sortCoins, truncateAddress } from '../utils/Helpers.mjs';
+import { coin, execableMessage, isValidBech32Address, sortCoins, truncateAddress } from '../utils/Helpers.mjs';
 import Coin from './Coin';
 
 function SendModal(props) {
@@ -136,7 +136,7 @@ function SendModal(props) {
     const value = state.recipientValue === 'custom' ? state.customRecipientValue : state.recipientValue
     if(!value) return true;
 
-    return !network.prefix || value.startsWith(network.prefix)
+    return isValidBech32Address(value, network.prefix)
   }
 
   function validBalance(){

@@ -45,8 +45,23 @@ function DelegateForm(props) {
     const amount = state.amount
     const memo = state.memo
 
-    const decimals = pow(10, network.decimals)
-    const denomAmount = bignumber(multiply(amount, decimals))
+    let denomAmount
+    try {
+      const decimals = pow(10, network.decimals)
+      denomAmount = bignumber(multiply(bignumber(amount), decimals))
+      if (!denomAmount.gt(0)) {
+        setState({ loading: false, error: 'Amount must be greater than 0' })
+        return
+      }
+      const available = availableBalance()?.amount
+      if (available !== undefined && denomAmount.gt(bignumber(available))) {
+        setState({ loading: false, error: 'Insufficient balance' })
+        return
+      }
+    } catch {
+      setState({ loading: false, error: 'Invalid amount' })
+      return
+    }
 
     let messages = buildMessages(denomAmount)
     let gas

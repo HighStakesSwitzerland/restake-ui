@@ -136,30 +136,30 @@ function ValidatorModal(props) {
   return (
     <>
       <Modal size='lg' show={props.show} onHide={handleClose}>
-        <Modal.Header closeButton>
-          <Modal.Title>
+        <Modal.Header closeButton className="py-3">
+          <Modal.Title className="fs-5">
             <div className="d-flex align-items-center gap-2">
               <ValidatorImage validator={validator} />
               <ValidatorLink validator={validator} />
             </div>
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="pt-3">
           {validator && (
             <Tab.Container activeKey={activeTab} onSelect={(k) => setTab(k)} id="validator-tabs">
-              <Nav variant="tabs" className="small mb-3 d-flex">
+              <Nav variant="tabs" className="small mb-3 d-flex flex-nowrap overflow-auto">
                 <Nav.Item>
-                  <Nav.Link role="button" eventKey="profile">Profile</Nav.Link>
+                  <Nav.Link role="button" eventKey="profile" className="text-nowrap">Profile</Nav.Link>
                 </Nav.Item>
                 <Nav.Item>
-                  <Nav.Link role="button" eventKey="stake">Stake</Nav.Link>
+                  <Nav.Link role="button" eventKey="stake" className="text-nowrap">Stake</Nav.Link>
                 </Nav.Item>
                 <Nav.Item>
-                  <Nav.Link role="button" eventKey="calculator">Calculator</Nav.Link>
+                  <Nav.Link role="button" eventKey="calculator" className="text-nowrap">Calculator</Nav.Link>
                 </Nav.Item>
                 {network.authzSupport && !network.authzAminoSupport && operator && (
-                  <Nav.Item className="d-none d-md-flex">
-                    <Nav.Link role="button" eventKey="ledger">Ledger</Nav.Link>
+                  <Nav.Item>
+                    <Nav.Link role="button" eventKey="ledger" className="text-nowrap">Ledger</Nav.Link>
                   </Nav.Item>
                 )}
               </Nav>
@@ -217,8 +217,8 @@ function ValidatorModal(props) {
             </Tab.Container>
           )}
           {activeTab === 'profile' && (
-            <div className="d-flex justify-content-end gap-2">
-              <Button variant="primary" onClick={() => setTab('stake')}>
+            <div className="d-flex justify-content-end gap-2 border-top pt-3 mt-3">
+              <Button variant="primary" size="sm" onClick={() => setTab('stake')}>
                 Stake
               </Button>
             </div>

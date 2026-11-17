@@ -13,9 +13,6 @@ import {
 import mainnetNetworks from '../networks.json';
 import testnetNetworks from '../networks.testnet.json';
 
-const LIGHT_THEME = 'cosmo'
-const DARK_THEME = 'superhero'
-
 function NetworkFinder() {
   const params = useParams();
   const navigate = useNavigate()
@@ -159,9 +156,7 @@ function NetworkFinder() {
 
   useEffect(() => {
     if (theme) {
-      const themeLink = document.getElementById("theme-style");
-      const themeName = theme === 'dark' ? DARK_THEME : LIGHT_THEME
-      themeLink.setAttribute("href", `https://cdn.jsdelivr.net/npm/bootswatch@5.1.3/dist/${themeName}/bootstrap.min.css`);
+      document.documentElement.setAttribute('data-bs-theme', theme);
       document.body.classList.toggle('dark-theme', theme === 'dark');
     }
   }, [theme])
@@ -229,10 +224,15 @@ function NetworkFinder() {
 
   if (state.loading) {
     return (
-      <div className="pt-5 text-center">
-        <Spinner animation="border" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </Spinner>
+      <div className="container py-5 d-flex flex-column align-items-center justify-content-center min-vh-50" role="status" aria-live="polite">
+        <div className="rs-surface-card p-4 text-center w-100" style={{ maxWidth: '420px' }}>
+          <Spinner animation="border" size="sm" className="mb-3 text-primary" aria-hidden="true" />
+          <div className="fw-medium mb-3">Loading networks...</div>
+          <div className="d-flex flex-column gap-2" aria-hidden="true">
+            <span className="rs-skeleton" style={{ height: '12px', width: '85%', margin: '0 auto' }} />
+            <span className="rs-skeleton" style={{ height: '12px', width: '65%', margin: '0 auto' }} />
+          </div>
+        </div>
       </div>
     )
   }

@@ -15,6 +15,7 @@ import {
 } from 'react-bootstrap-icons'
 import Address from './Address.js';
 import TooltipIcon from './TooltipIcon.js';
+import { isValidBech32Address } from '../utils/Helpers.mjs';
 
 function SavedAddresses(props) {
   const { network, networks, favouriteAddresses, updateFavouriteAddresses } = props
@@ -53,13 +54,15 @@ function SavedAddresses(props) {
     event.preventDefault()
     if (!validNewAddress()) return
 
-    updateFavouriteAddresses({ ...favouriteAddresses, [network.path]: [...networkAddresses, { address: newAddress, label: newLabel }] })
+    const trimmedAddress = newAddress.trim()
+    updateFavouriteAddresses({ ...favouriteAddresses, [network.path]: [...networkAddresses, { address: trimmedAddress, label: newLabel }] })
     setNewAddress('')
     setNewLabel('')
   }
 
   function validNewAddress() {
-    return newAddress !== '' && !networkAddresses.some(el => el.address === newAddress)
+    const trimmedAddress = newAddress.trim()
+    return trimmedAddress !== '' && isValidBech32Address(trimmedAddress, selectedNetwork?.prefix || props.network?.prefix) && !networkAddresses.some(el => el.address === trimmedAddress)
   }
 
   return (

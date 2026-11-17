@@ -14,6 +14,7 @@ import StakingRewardsVerifiedWhiteIcon from '../assets/staking-rewards-verified-
 import Cosmostation from '../assets/cosmostation.svg'
 import PingPub from '../assets/ping-pub.svg'
 import NodesGuru from '../assets/nodes-guru.svg'
+import { sanitizeUrl } from '../utils/Helpers.mjs'
 
 function ValidatorServices(props) {
   const { validator, network, theme } = props
@@ -60,7 +61,7 @@ function ValidatorServices(props) {
       key: 'stakingrewards',
       tooltip: <span>Staking Rewards <br />{verified ? 'Verified' : ''} Provider</span>,
       icon: icon,
-      url: `https://www.stakingrewards.com/savings/${validator.services.staking_rewards.slug}`
+      url: `https://www.stakingrewards.com/savings/${encodeURIComponent(validator.services.staking_rewards.slug)}`
     })
   }
 
@@ -105,6 +106,8 @@ function ValidatorServices(props) {
   return (
     <div className="d-flex gap-2 align-items-center">
       {showServices.map(service => {
+        const safeUrl = service.url ? sanitizeUrl(service.url) : null
+        if(!service.render && !safeUrl) return null
         return (
           <OverlayTrigger
             placement="top"
@@ -115,7 +118,7 @@ function ValidatorServices(props) {
             }
           >
             {service.render ? service.render() : (
-              <a href={service.url} target={service.target || '_blank'}>
+              <a href={safeUrl} target={service.target || '_blank'} rel="noopener noreferrer">
                 <img src={service.icon} height={props.height || 20} className="d-block" />
               </a>
             )}

@@ -17,15 +17,15 @@ import {
   Spinner
 } from 'react-bootstrap';
 import {
-  Droplet,
-  DropletFill,
-  DropletHalf,
+  Sun,
+  Moon,
+  CircleHalf,
   CashCoin,
   Coin as CoinIcon,
   EnvelopePaper,
   Stars,
-  WrenchAdjustableCircle,
   WrenchAdjustableCircleFill,
+  Globe,
   Magic,
   Clipboard,
   ClipboardCheck,
@@ -220,9 +220,7 @@ class App extends React.Component {
     this.setState({
       address,
       wallet,
-      error: false,
-      qrCodeUri: null,
-      qrCodeCallback: null
+      error: false
     })
   }
 
@@ -456,10 +454,13 @@ class App extends React.Component {
   }
 
   showWalletModal(opts) {
-    opts = opts || {}
-    this.setState((state) => {
-      return { walletModal: { ...state.validatorModal, show: true, ...opts } }
-    })
+    this.setState((state) => ({
+      walletModal: {
+        ...state.walletModal,
+        ...opts,
+        show: true
+      }
+    }))
   }
 
   hideWalletModal(opts) {
@@ -480,55 +481,83 @@ class App extends React.Component {
     const { theme, themeChoice, themeDefault, setThemeChoice } = this.props
     let icon, switchTo
     let iconProps = {
-      size: '1.4em',
-      className: 'me-3',
+      size: '1.25em',
+      className: 'me-2 me-md-3',
       role: 'button',
-      onClick: () => setThemeChoice(switchTo)
+      tabIndex: 0,
+      onClick: () => setThemeChoice(switchTo),
+      onKeyDown: (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setThemeChoice(switchTo)
+        }
+      }
     }
     if (themeChoice === 'auto') {
-      icon = <DropletHalf {...iconProps} />
+      icon = <CircleHalf {...iconProps} aria-label="Theme: Auto" />
       switchTo = theme === 'dark' ? 'light' : 'dark'
     } else {
-      icon = themeChoice === 'dark' ? <DropletFill {...iconProps} /> : <Droplet {...iconProps} />
+      icon = themeChoice === 'dark'
+        ? <Moon {...iconProps} aria-label="Theme: Dark" />
+        : <Sun {...iconProps} aria-label="Theme: Light" />
       switchTo = themeDefault !== theme ? 'auto' : theme === 'dark' ? 'light' : 'dark'
     }
     const tooltip = `Switch to ${switchTo} mode`
     return (
-      <span>
+      <span className="d-inline-flex align-items-center">
         <TooltipIcon icon={icon} tooltip={tooltip} placement="left" rootClose={true} />
       </span>
     )
   }
 
   networkIcon() {
-    let icon, mode
-    let iconProps = {
-      size: '1.4em',
-      className: 'mx-2 mx-md-3',
-      role: 'button',
-      onClick: () => this.props.changeNetworkMode(mode)
-    }
-    if (this.props.directory.testnet) {
-      iconProps.className = iconProps.className + ' text-warning'
-      icon = <WrenchAdjustableCircleFill {...iconProps} />
-      mode = 'mainnet'
-    } else {
-      iconProps.className = iconProps.className + ' text-muted'
-      icon = <WrenchAdjustableCircle {...iconProps} />
-      mode = 'testnet'
-    }
+    const isTestnet = this.props.directory.testnet
+    const mode = isTestnet ? 'mainnet' : 'testnet'
     const tooltip = `Switch to ${mode}`
+    const pill = (
+      <button
+        type="button"
+        id="network-mode-toggle"
+        onClick={() => this.props.changeNetworkMode(mode)}
+        className={`btn btn-sm rounded-pill d-inline-flex align-items-center gap-1 me-2 me-md-3 ${
+          isTestnet
+            ? 'btn-outline-warning text-warning-emphasis bg-warning-subtle border-warning-subtle'
+            : 'btn-outline-secondary text-body-secondary'
+        }`}
+        aria-label={tooltip}
+      >
+        {isTestnet ? <WrenchAdjustableCircleFill size={13} /> : <Globe size={13} />}
+        <span className="small fw-medium">{isTestnet ? 'Testnet' : 'Mainnet'}</span>
+      </button>
+    )
     return (
-      <span className="text-reset">
-        <TooltipIcon icon={icon} tooltip={tooltip} placement="left" />
+      <span className="text-reset d-inline-flex align-items-center">
+        <TooltipIcon icon={pill} tooltip={tooltip} placement="left" />
       </span>
     )
+  }
+
+  pageTitle() {
+    const networkName = this.props.network?.prettyName
+    switch (this.props.active) {
+      case 'networks':
+        return 'Explore Networks'
+      case 'voting':
+        return networkName ? `${networkName} Governance` : 'Governance'
+      case 'grants':
+        return networkName ? `${networkName} Authz Grants` : 'Authz Grants'
+      case 'swap':
+        return networkName ? `Swap on ${networkName}` : 'Swap'
+      case 'delegations':
+      default:
+        return networkName ? `${networkName} Staking` : 'Staking'
+    }
   }
 
   introText(){
     switch (this.props.active) {
       case 'networks':
-        return <span>REStake automatically imports <a href="https://cosmos.network/" target="_blank" className="text-reset"><strong>Cosmos</strong></a> chains from the <a href="https://github.com/cosmos/chain-registry" target="_blank" className="text-reset"><strong>Chain Registry</strong></a></span>
+        return <span>REStake automatically imports <a href="https://cosmos.network/" target="_blank" rel="noopener noreferrer" className="text-reset"><strong>Cosmos</strong></a> chains from the <a href="https://github.com/cosmos/chain-registry" target="_blank" rel="noopener noreferrer" className="text-reset"><strong>Chain Registry</strong></a></span>
       case 'voting':
         return <span>REStake let's you vote on behalf of your other {this.props.network && <strong onClick={this.showNetworkSelect} className="text-decoration-underline text-nowrap" role="button">{this.props.network.prettyName}</strong>} wallets using Authz</span>
       case 'grants':
@@ -552,8 +581,8 @@ class App extends React.Component {
   render() {
     return (
       <Container fluid="xl">
-        <header className="">
-          <div className="d-flex justify-content-between align-items-center py-3 border-bottom">
+        <header className="rs-header">
+          <div className="d-flex justify-content-between align-items-center gap-3 py-3 border-bottom">
             <div className="logo d-flex align-items-end text-reset text-decoration-none">
               <span onClick={() => this.props.setActive('networks')} role="button" className="text-reset text-decoration-none">
                 {this.props.theme === 'light'
@@ -567,12 +596,7 @@ class App extends React.Component {
                 <small className="ms-2 text-muted">testnet</small>
               )}
             </div>
-            <div className="d-flex align-items-center text-reset text-decoration-none">
-              <p className="lead fs-6 text-center m-0 px-5 d-lg-block d-none">
-                {this.introText()}
-              </p>
-            </div>
-            <div className="d-flex align-items-center text-reset text-decoration-none">
+            <div className="d-flex align-items-center text-reset text-decoration-none flex-shrink-0">
               {this.networkIcon()}
               {this.themeIcon()}
               <NetworkSelect show={this.state.showNetworkSelect} onHide={() => { this.setState({ showNetworkSelect: false }) }} networks={this.props.networks}
@@ -584,37 +608,37 @@ class App extends React.Component {
               />
             </div>
           </div>
-          <div className="d-flex justify-content-between border-bottom">
-            <Navbar className={`navbar navbar-expand ${this.props.theme === 'dark' ? 'navbar-dark' : 'navbar-light'} me-3`}>
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-1 border-bottom">
+            <Navbar className={`navbar navbar-expand ${this.props.theme === 'dark' ? 'navbar-dark' : 'navbar-light'} me-2 py-1`}>
               <div className="justify-content-center">
                 <Nav activeKey={this.props.active} onSelect={(e) => this.props.setActive(e)}>
                   <div className="nav-item pe-2 border-end text-center">
-                    <Nav.Link eventKey="networks">
+                    <Nav.Link id="nav-explore" eventKey="networks">
                       <Stars className="mb-1 me-1" /><span className="d-none d-sm-inline"> Explore</span>
                     </Nav.Link>
                   </div>
                   {this.props.network && (
                     <>
                       <div className="nav-item px-2 border-end text-center">
-                        <Nav.Link eventKey="delegations">
+                        <Nav.Link id="nav-stake" eventKey="delegations">
                           <CoinIcon className="mb-1 me-1" /><span className="d-none d-sm-inline"> Stake</span>
                         </Nav.Link>
                       </div>
                       <div className="nav-item px-2 border-end text-center">
-                        <Nav.Link eventKey="voting">
+                        <Nav.Link id="nav-vote" eventKey="voting">
                           <EnvelopePaper className="mb-1 me-1" /><span className="d-none d-sm-inline"> Vote</span>
                         </Nav.Link>
                       </div>
                       {this.state.address && this.props.network.authzSupport && (
                         <div className="nav-item px-2 border-end text-center">
-                          <Nav.Link eventKey="grants">
+                          <Nav.Link id="nav-grant" eventKey="grants">
                             <Magic className="mb-1 me-1" /><span className="d-none d-sm-inline"> Grant</span>
                           </Nav.Link>
                         </div>
                       )}
                       {!this.props.directory.testnet && (
                         <div className="nav-item px-2 text-center">
-                          <Nav.Link eventKey="swap">
+                          <Nav.Link id="nav-swap" eventKey="swap">
                             <CurrencyExchange className="mb-1 me-1" /><span className="d-none d-sm-inline"> Swap</span>
                           </Nav.Link>
                         </div>
@@ -624,13 +648,13 @@ class App extends React.Component {
                 </Nav>
               </div>
             </Navbar>
-            <nav className={`navbar navbar-expand ${this.props.theme === 'dark' ? 'navbar-dark' : 'navbar-light'}`}>
-              <div className="justify-content-center">
-                <ul className="navbar-nav">
+            <nav className={`navbar navbar-expand ${this.props.theme === 'dark' ? 'navbar-dark' : 'navbar-light'} py-1 ms-auto`}>
+              <div className="justify-content-end">
+                <ul className="navbar-nav align-items-center flex-wrap gap-1">
                   {this.props.network && (
                     <>
                       {(this.state.wallet || this.favouriteAddresses().length > 0) && (
-                        <li className="nav-item pe-3 border-end d-flex align-items-center">
+                        <li className="nav-item pe-2 pe-md-3 border-end d-flex align-items-center">
                           {this.state.address && (
                             <>
                               <span className="d-none d-md-inline pe-2">
@@ -659,9 +683,9 @@ class App extends React.Component {
                             </>
                           )}
                           {this.otherFavouriteAddresses().length < 1 && this.state.wallet ? (
-                            <span role="button" onClick={() => this.showWalletModal({ activeTab: 'wallet' })} className="small d-none d-lg-inline ms-2">{this.state.wallet.name || truncateAddress(this.state.wallet.address)}</span>
+                            <span role="button" onClick={() => this.showWalletModal({ activeTab: 'wallet' })} className="small d-none d-lg-inline ms-2 text-truncate" style={{maxWidth: 160}}>{this.state.wallet.name || truncateAddress(this.state.wallet.address)}</span>
                           ) : (
-                            <select className="form-select form-select-sm d-none d-lg-block ms-2" aria-label="Address" value={this.state.address || ''} onChange={(e) => this.setState({ address: e.target.value })} style={{maxWidth: 200}}>
+                            <select className="form-select form-select-sm d-none d-lg-block ms-2" aria-label="Address" value={this.state.address || ''} onChange={(e) => this.setState({ address: e.target.value })} style={{maxWidth: 185}}>
                               {this.state.wallet ? (
                                 <optgroup label={this.state.wallet.signerProvider.label}>
                                   <option value={this.state.wallet.address}>{this.state.wallet.name || truncateAddress(this.state.wallet.address)}</option>
@@ -691,7 +715,7 @@ class App extends React.Component {
                         </li>
                       )}
                       {this.state.address && (
-                      <li className="nav-item px-3 border-end align-items-center d-none d-md-flex">
+                      <li className="nav-item px-2 px-md-3 border-end align-items-center d-none d-md-flex">
                         <div role="button" onClick={() => this.showWalletModal({activeTab: this.state.wallet ? 'wallet' : 'saved'})}>
                           {this.state.balance ? (
                             <Coin
@@ -708,9 +732,9 @@ class App extends React.Component {
                         </div>
                       </li>
                       )}
-                      <li className="nav-item ps-3 d-flex align-items-center">
+                      <li className="nav-item ps-2 ps-md-3 d-flex align-items-center">
                         <Dropdown as={ButtonGroup}>
-                          <Dropdown.Toggle size="sm" className="rounded">
+                          <Dropdown.Toggle id="connect-wallet-btn" size="sm" className="rounded">
                             {this.state.address ? (
                               <>
                                 <CashCoin className="me-1" />
@@ -769,10 +793,16 @@ class App extends React.Component {
             </nav>
           </div>
         </header>
-        <div className="my-4">
+        <main className="my-4" id="main-content">
+          <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-2 pb-3 mb-4 border-bottom">
+            <div>
+              <h1 className="h4 fw-semibold mb-1">{this.pageTitle()}</h1>
+              <p className="text-body-secondary small mb-0">{this.introText()}</p>
+            </div>
+          </div>
           {this.props.network?.experimental && this.props.active !== 'networks' && (
             <AlertMessage variant="info" dismissible={false}>
-              This network was added to REStake automatically and has not been thoroughly tested yet. <a href="https://github.com/eco-stake/restake-ui/issues" target="_blank">Raise an issue</a> if you have any problems.
+              This network was added to REStake automatically and has not been thoroughly tested yet. <a href="https://github.com/eco-stake/restake-ui/issues" target="_blank" rel="noopener noreferrer">Raise an issue</a> if you have any problems.
             </AlertMessage>
           )}
           {this.props.network?.networkAlert && (
@@ -839,9 +869,9 @@ class App extends React.Component {
               getBalance={this.getBalance}
             />
           )}
-        </div>
+        </main>
         <footer className="d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
-          <a href="https://akash.network" target="_blank" rel="noreferrer" className="col-md-4 mb-0 text-muted">
+          <a href="https://akash.network" target="_blank" rel="noopener noreferrer" className="col-md-4 mb-0 text-muted">
             {this.props.theme === 'light'
               ? (
                 <img src={PoweredByAkash} alt="Powered by Akash" width={200} />
@@ -851,10 +881,10 @@ class App extends React.Component {
           </a>
 
           <div className="col-md-4 align-items-center text-center me-lg-auto">
-            <a href="https://ecostake.com" target="_blank" rel="noreferrer" className="text-reset text-decoration-none d-block mb-2">
+            <a href="https://ecostake.com" target="_blank" rel="noopener noreferrer" className="text-reset text-decoration-none d-block mb-2">
               <span className="d-none d-sm-inline">Built with 💚&nbsp;</span> by ECO Stake 🌱
             </a>
-            <a href={`https://${this.props.directory.domain}`} target="_blank" className="text-reset text-decoration-none d-block small">
+            <a href={`https://${this.props.directory.domain}`} target="_blank" rel="noopener noreferrer" className="text-reset text-decoration-none d-block small">
               <span className="d-none d-sm-inline">Interchain APIs from</span> <u>cosmos.directory</u>
             </a>
           </div>

@@ -38,48 +38,50 @@ function WalletModal(props) {
   return (
     <>
       <Modal size="lg" show={show} onHide={() => onHide()}>
-        <Modal.Header closeButton>
-          <Modal.Title>Wallet</Modal.Title>
+        <Modal.Header closeButton className="py-3">
+          <Modal.Title className="fs-5">Wallet</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="pt-3">
           <Tab.Container activeKey={activeTab} onSelect={(k) => setActiveTab(k)} id="wallet-tabs">
-            <Nav variant="tabs" className="small mb-3 d-flex">
+            <Nav variant="tabs" className="small mb-3 d-flex flex-nowrap overflow-auto">
               <Nav.Item>
-                <Nav.Link role="button" eventKey="wallet" disabled={!wallet}>Wallet</Nav.Link>
+                <Nav.Link role="button" eventKey="wallet" disabled={!wallet} className="text-nowrap">Wallet</Nav.Link>
               </Nav.Item>
               <Nav.Item>
-                <Nav.Link role="button" eventKey="saved">Saved Addresses</Nav.Link>
+                <Nav.Link role="button" eventKey="saved" className="text-nowrap">Saved Addresses</Nav.Link>
               </Nav.Item>
             </Nav>
             <Tab.Content>
               <Tab.Pane eventKey="wallet" className="small">
                 {wallet && (
                   <>
-                  <Table>
+                  <Table className="align-middle mb-3">
                     <tbody>
                       <tr>
-                        <td scope="row">Wallet Provider</td>
+                        <td scope="row" className="text-muted fw-medium">Wallet Provider</td>
                         <td className="text-break">
-                          <div className="d-flex gap-2">
+                          <div className="d-flex align-items-center gap-2">
                             {wallet.signerProvider?.label || 'None'}
                           </div>
                         </td>
                       </tr>
                       {wallet.name && (
                         <tr>
-                          <td scope="row">Wallet Name</td>
+                          <td scope="row" className="text-muted fw-medium">Wallet Name</td>
                           <td className="text-break">
-                            <div className="d-flex gap-2">
+                            <div className="d-flex align-items-center gap-2">
                               {wallet.name}
                             </div>
                           </td>
                         </tr>
                       )}
                       <tr>
-                        <td scope="row">Address</td>
+                        <td scope="row" className="text-muted fw-medium">Address</td>
                         <td className="text-break">
-                          <div className="d-flex gap-2">
-                            <Address address={wallet.address} />
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="font-mono">
+                              <Address address={wallet.address} />
+                            </span>
                             <Favourite
                               value={(favouriteAddresses[network.path] || []).some(el => el['address'] === wallet.address)}
                               toggle={() => props.toggleFavouriteAddress(wallet.address, props.address === wallet?.address && wallet.name)}
@@ -90,18 +92,18 @@ function WalletModal(props) {
                         </td>
                       </tr>
                       <tr>
-                        <td scope="row">Balance</td>
-                        <td className="text-break">
+                        <td scope="row" className="text-muted fw-medium">Balance</td>
+                        <td className="text-break tabular-nums">
                           <Coins coins={balances} network={network} fullPrecision={true} />
                         </td>
                       </tr>
                     </tbody>
                   </Table>
-                  <div className="d-flex justify-content-end gap-2">
-                    <Button variant="secondary" disabled={wallet.address === props.address} onClick={() => props.setAddress(wallet.address)}>
+                  <div className="d-flex justify-content-end gap-2 border-top pt-3 mt-3">
+                    <Button variant="secondary" size="sm" disabled={wallet.address === props.address} onClick={() => props.setAddress(wallet.address)}>
                       {wallet.address === props.address ? 'Viewing wallet' : 'View wallet'}
                     </Button>
-                    <Button variant="primary" onClick={() => setActiveTab('saved')}>
+                    <Button variant="primary" size="sm" onClick={() => setActiveTab('saved')}>
                       Saved addresses
                     </Button>
                   </div>

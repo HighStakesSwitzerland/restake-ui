@@ -11,7 +11,7 @@ import {
 
 import AlertMessage from './AlertMessage';
 import { messageTypes } from '../utils/Wallet.mjs';
-import { execableMessage, truncateAddress } from '../utils/Helpers.mjs';
+import { execableMessage, isValidBech32Address, truncateAddress } from '../utils/Helpers.mjs';
 import { MsgGrant } from '../messages/MsgGrant.mjs';
 import { GenericAuthorization } from '../messages/authorizations/GenericAuthorization.mjs';
 
@@ -119,7 +119,7 @@ function GrantModal(props) {
     const value = grantee()
     if(!value) return true;
 
-    return !network.prefix || value.startsWith(network.prefix)
+    return isValidBech32Address(value, network.prefix)
   }
 
   function favourites(){

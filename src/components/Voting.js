@@ -3,7 +3,6 @@ import _ from 'lodash'
 
 import {
   Nav,
-  Spinner,
   Pagination
 } from 'react-bootstrap'
 import { useParams, useNavigate } from "react-router-dom";
@@ -229,7 +228,7 @@ function Voting(props) {
         if (votes[proposal_id] && !clearExisting) return
 
         return network.restClient.getProposalVote(proposal_id, address, {
-          'axios-retry': { retryCondition: (e) => e.response.status !== 400 }
+          'axios-retry': { retryCondition: (e) => e.response?.status !== 400 }
         }
         ).then(result => {
           return setVotes({ [proposal_id]: Vote(result.vote) })
@@ -273,14 +272,21 @@ function Voting(props) {
     </>
   );
 
+  const loadingSkeleton = (
+    <div className="rs-table-wrapper p-3" aria-busy="true" aria-label="Loading proposals">
+      {[0, 1, 2, 3, 4].map((idx) => (
+        <div key={idx} className="d-flex align-items-center gap-3 py-2 border-bottom">
+          <div className="rs-skeleton d-none d-md-block" style={{ height: '1.125rem', width: '40px' }} />
+          <div className="rs-skeleton flex-grow-1" style={{ height: '1.125rem' }} />
+          <div className="rs-skeleton d-none d-sm-block" style={{ height: '1.25rem', width: '90px' }} />
+          <div className="rs-skeleton" style={{ height: '1.5rem', width: '60px' }} />
+        </div>
+      ))}
+    </div>
+  );
+
   if(loading && !pagesLoaded){
-    return (
-      <div className="my-5 text-center">
-        <Spinner animation="border" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </Spinner>
-      </div>
-    )
+    return loadingSkeleton;
   }
 
   const proposalsForDisplay = _.chunk(proposals, pageSize)[page-1] || []
@@ -289,25 +295,31 @@ function Voting(props) {
     <>
       {alerts}
       <div className="mb-2">
-        <div className="d-flex flex-wrap justify-content-center align-items-start mb-3 position-relative">
-          <div className="d-lg-flex d-none position-absolute mx-auto justify-content-center align-self-center">
-            <Nav fill variant="pills" activeKey={filter.group} className={`${props.modal ? ' small' : ''}`} onSelect={(e) => setFilter({group: e})}>
-              <Nav.Item>
-                <Nav.Link eventKey="voting" disabled={proposals.filter(el => el.isVoting).length == 0}>Voting Period</Nav.Link>
-              </Nav.Item>
-              <Nav.Item>
-                <Nav.Link eventKey="all">All Proposals</Nav.Link>
-              </Nav.Item>
-            </Nav>
-          </div>
-          <div className="d-flex d-lg-none justify-content-center">
-            <select className="form-select w-auto h-auto" aria-label="Proposal group" value={filter.group} onChange={(e) => setFilter({group: e.target.value})}>
-              <option value="voting" disabled={proposals.filter(el => el.isVoting).length == 0}>Voting Period</option>
-              <option value="all">All</option>
-            </select>
-          </div>
-          <div className="flex-fill d-flex justify-content-end">
-            <select className="form-select w-auto h-auto" aria-label="Proposal status" disabled={filter.group == 'voting'} value={filter.status} onChange={(e) => setFilter({status: e.target.value})}>
+        <div className="rs-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+          <Nav
+            id="proposal-group-filter"
+            fill
+            variant="pills"
+            activeKey={filter.group}
+            className={`flex-row${props.modal ? ' small' : ''}`}
+            onSelect={(e) => setFilter({group: e})}
+          >
+            <Nav.Item>
+              <Nav.Link eventKey="voting" disabled={proposals.filter(el => el.isVoting).length == 0}>Voting Period</Nav.Link>
+            </Nav.Item>
+            <Nav.Item>
+              <Nav.Link eventKey="all">All Proposals</Nav.Link>
+            </Nav.Item>
+          </Nav>
+          <div className="d-flex justify-content-end ms-auto">
+            <select
+              id="proposal-status-filter"
+              className="form-select w-auto h-auto"
+              aria-label="Proposal status"
+              disabled={filter.group == 'voting'}
+              value={filter.status}
+              onChange={(e) => setFilter({status: e.target.value})}
+            >
               {Object.entries(PROPOSAL_STATUSES).map(([key, value]) => {
                 return (
                   <option key={key} value={key}>{value}</option>
@@ -317,11 +329,7 @@ function Voting(props) {
           </div>
         </div>
         {loading ? (
-          <div className="my-5 text-center">
-            <Spinner animation="border" role="status">
-              <span className="visually-hidden">Loading...</span>
-            </Spinner>
-          </div>
+          loadingSkeleton
         ) : (
           <>
             <Proposals
@@ -334,9 +342,10 @@ function Voting(props) {
               setError={setError}
               onVote={onVote} />
 
-            <Pagination className="justify-content-between">
-              <Pagination.Next onClick={getNextProposals} disabled={nextKey === null}>&lsaquo; Older</Pagination.Next>
-              <Pagination.Prev onClick={getPrevProposals} disabled={page === 1}>Newer &rsaquo;</Pagination.Prev>
+            <Pagination className="justify-content-between align-items-center mt-3">
+              <Pagination.Prev onClick={getPrevProposals} disabled={page === 1}>&lsaquo; Newer</Pagination.Prev>
+              <span className="text-body-secondary small tabular-nums">Page {page}</span>
+              <Pagination.Next onClick={getNextProposals} disabled={nextKey === null}>Older &rsaquo;</Pagination.Next>
             </Pagination>
           </>
         )}
