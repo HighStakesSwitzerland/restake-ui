@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { larger, smaller, round } from 'mathjs'
 import moment from 'moment'
 
+import Select from 'react-select'
 import {
   Table,
   Dropdown,
   Button,
-  Spinner
+  Spinner,
+  Badge
 } from 'react-bootstrap'
-import { ChevronLeft, CheckCircle, XCircle, QuestionCircle } from "react-bootstrap-icons";
+import { ChevronLeft, CheckCircle, XCircle, QuestionCircle, LightningChargeFill } from "react-bootstrap-icons";
 
 import Coin from './Coin';
 import TooltipIcon from './TooltipIcon'
@@ -16,7 +18,6 @@ import TooltipIcon from './TooltipIcon'
 import DelegateForm from './DelegateForm'
 import { authzSupportMessage, rewardAmount } from '../utils/Helpers.mjs';
 import ClaimRewards from './ClaimRewards';
-import Validators from './Validators'
 import AlertMessage from './AlertMessage'
 import REStakeGrantForm from './REStakeGrantForm';
 import Address from './Address';
@@ -519,6 +520,37 @@ function ValidatorStake(props) {
     )
   }
 
+  function renderRestakeHero() {
+    if (!operator) return null;
+    const apyBoost = network.apyEnabled && validator.getAPY && validator.getAPR
+      ? round((validator.getAPY(operator) - validator.getAPR()) * 100, 2)
+      : 0;
+
+    return (
+      <div className={`rs-restake-hero mb-3 ${grantsValid ? 'is-active' : ''}`}>
+        <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div>
+            <div className="d-flex align-items-center gap-2">
+              <LightningChargeFill size={15} className={grantsValid ? 'text-success' : 'text-primary'} />
+              <span className="fw-semibold small">
+                {grantsValid ? 'REStake Auto-Compounding Active' : 'REStake Auto-Compounding'}
+              </span>
+              {apyBoost > 0 && (
+                <Badge bg="success-subtle" className="text-success-emphasis border border-success-subtle small">
+                  +{apyBoost}% APY boost
+                </Badge>
+              )}
+            </div>
+            <div className="small text-body-secondary mt-1">
+              Compounds {operator.frequency()} • Min <Coin {...minimumReward()} asset={network.baseAsset} fullPrecision={true} showValue={false} showImage={false} /> • Validator pays fees
+            </div>
+          </div>
+          {renderRestakeControl()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {error &&
@@ -528,6 +560,7 @@ function ValidatorStake(props) {
       }
       {action ? renderActionStep() : (
         <>
+          {renderRestakeHero()}
           {renderStakeDetails()}
           {renderActionMenu()}
         </>

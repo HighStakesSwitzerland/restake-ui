@@ -5,6 +5,7 @@ import {
   Nav,
   Pagination
 } from 'react-bootstrap'
+import { Search, XCircle } from 'react-bootstrap-icons'
 import { useParams, useNavigate } from "react-router-dom";
 
 import AlertMessage from './AlertMessage';
@@ -289,13 +290,43 @@ function Voting(props) {
     return loadingSkeleton;
   }
 
-  const proposalsForDisplay = _.chunk(proposals, pageSize)[page-1] || []
+  const filteredProposals = searchQuery.trim()
+    ? proposals.filter(p =>
+        p.title?.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+        String(p.proposal_id).includes(searchQuery.trim().replace(/^#/, ''))
+      )
+    : proposals
+  const proposalsForDisplay = _.chunk(filteredProposals, pageSize)[page-1] || []
 
   return (
     <>
       {alerts}
       <div className="mb-2">
         <div className="rs-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+          <div className="input-group w-auto flex-grow-1 flex-sm-grow-0" style={{ minWidth: '180px', maxWidth: '240px' }}>
+            <span className="input-group-text bg-transparent border-end-0 text-body-secondary">
+              <Search size={14} aria-hidden="true" />
+            </span>
+            <input
+              id="proposal-search-input"
+              className="form-control border-start-0 border-end-0"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+              type="text"
+              placeholder="Search #ID or title..."
+              aria-label="Search proposals"
+            />
+            {searchQuery && (
+              <button
+                className="btn border border-start-0 text-body-secondary"
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setSearchQuery('')}
+              >
+                <XCircle size={14} />
+              </button>
+            )}
+          </div>
           <Nav
             id="proposal-group-filter"
             fill

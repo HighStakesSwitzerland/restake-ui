@@ -7,11 +7,13 @@ import ValidatorLink from './ValidatorLink'
 import AboutLedger from './AboutLedger';
 
 import {
-  Modal,
+  Offcanvas,
   Tab,
   Nav,
-  Button
+  Button,
+  Badge
 } from 'react-bootstrap'
+import { round } from 'mathjs'
 
 import ValidatorStake from './ValidatorStake';
 import ValidatorProfile from './ValidatorProfile';
@@ -135,31 +137,58 @@ function ValidatorModal(props) {
 
   return (
     <>
-      <Modal size='lg' show={props.show} onHide={handleClose}>
-        <Modal.Header closeButton className="py-3">
-          <Modal.Title className="fs-5">
-            <div className="d-flex align-items-center gap-2">
-              <ValidatorImage validator={validator} />
-              <ValidatorLink validator={validator} />
+      <Offcanvas
+        show={props.show}
+        onHide={handleClose}
+        placement="end"
+        className="rs-inspector-drawer"
+      >
+        <Offcanvas.Header closeButton className="border-bottom py-3">
+          {validator && (
+            <div className="d-flex align-items-center gap-3 min-w-0 w-100 pe-2">
+              <ValidatorImage validator={validator} width={40} height={40} />
+              <div className="min-w-0 flex-grow-1">
+                <div className="d-flex align-items-center gap-2">
+                  <Offcanvas.Title className="fs-6 fw-semibold text-truncate mb-0">
+                    <ValidatorLink validator={validator} />
+                  </Offcanvas.Title>
+                  {!validator.active && (
+                    <Badge bg="danger-subtle" className="text-danger-emphasis border border-danger-subtle small">
+                      {validator.jailed ? 'Jailed' : 'Inactive'}
+                    </Badge>
+                  )}
+                </div>
+                <div className="d-flex align-items-center gap-2 small text-body-secondary tabular-nums mt-1">
+                  <span>Rank #{validator.rank}</span>
+                  <span>•</span>
+                  <span>Fee {round((validator.commissionRate || 0) * 100, 2)}%</span>
+                  {operator && (
+                    <>
+                      <span>•</span>
+                      <span className="text-success fw-medium">REStake {operator.frequency()}</span>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="pt-3">
+          )}
+        </Offcanvas.Header>
+        <Offcanvas.Body className="pt-3">
           {validator && (
             <Tab.Container activeKey={activeTab} onSelect={(k) => setTab(k)} id="validator-tabs">
-              <Nav variant="tabs" className="small mb-3 d-flex flex-nowrap overflow-auto">
-                <Nav.Item>
-                  <Nav.Link role="button" eventKey="profile" className="text-nowrap">Profile</Nav.Link>
+              <Nav variant="pills" className="rs-nav-segmented w-100 mb-3 d-flex flex-nowrap overflow-auto">
+                <Nav.Item className="flex-fill text-center">
+                  <Nav.Link role="button" eventKey="stake" className="text-nowrap justify-content-center w-100">Stake & REStake</Nav.Link>
                 </Nav.Item>
-                <Nav.Item>
-                  <Nav.Link role="button" eventKey="stake" className="text-nowrap">Stake</Nav.Link>
+                <Nav.Item className="flex-fill text-center">
+                  <Nav.Link role="button" eventKey="profile" className="text-nowrap justify-content-center w-100">Profile</Nav.Link>
                 </Nav.Item>
-                <Nav.Item>
-                  <Nav.Link role="button" eventKey="calculator" className="text-nowrap">Calculator</Nav.Link>
+                <Nav.Item className="flex-fill text-center">
+                  <Nav.Link role="button" eventKey="calculator" className="text-nowrap justify-content-center w-100">Calculator</Nav.Link>
                 </Nav.Item>
                 {network.authzSupport && !network.authzAminoSupport && operator && (
-                  <Nav.Item>
-                    <Nav.Link role="button" eventKey="ledger" className="text-nowrap">Ledger</Nav.Link>
+                  <Nav.Item className="flex-fill text-center">
+                    <Nav.Link role="button" eventKey="ledger" className="text-nowrap justify-content-center w-100">Ledger</Nav.Link>
                   </Nav.Item>
                 )}
               </Nav>
@@ -219,12 +248,12 @@ function ValidatorModal(props) {
           {activeTab === 'profile' && (
             <div className="d-flex justify-content-end gap-2 border-top pt-3 mt-3">
               <Button variant="primary" size="sm" onClick={() => setTab('stake')}>
-                Stake
+                Stake with {validator?.moniker}
               </Button>
             </div>
           )}
-        </Modal.Body>
-      </Modal>
+        </Offcanvas.Body>
+      </Offcanvas>
     </>
   );
 }

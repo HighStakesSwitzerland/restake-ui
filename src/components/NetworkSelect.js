@@ -1,293 +1,323 @@
-import React, { useState, useReducer, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import FuzzySearch from 'fuzzy-search';
+import { round } from 'mathjs';
 
 import {
-  Button,
   Modal,
-  Form,
-  Badge
-} from 'react-bootstrap'
+  Badge,
+  Spinner
+} from 'react-bootstrap';
+import {
+  BookmarkStar,
+  BookmarkStarFill,
+  ChevronDown,
+  Search,
+  XCircle,
+  Globe,
+  WrenchAdjustableCircleFill
+} from 'react-bootstrap-icons';
 
-import Select from 'react-select';
-import NetworkChecks from './NetworkChecks.js';
 import NetworkImage from './NetworkImage.js';
-import Favourite from './Favourite.js';
-import { BookmarkStar, BookmarkStarFill, ChevronDown } from 'react-bootstrap-icons';
+import AlertMessage from './AlertMessage.js';
 
 function NetworkSelect(props) {
-  const [show, setShow] = useState(props.show);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const [selectedNetwork, setSelectedNetwork] = useState();
-  const [options, setOptions] = useReducer(
-    (state, newState) => ({ ...state, ...newState }),
-    { networks: [], operators: [], network: { value: '' } }
-  )
-
-  function handleOpen() {
-    setSelectedNetwork(props.network);
-    setShow(true);
-  }
-
-  function handleClose() {
-    setSelectedNetwork();
-    setShow(false);
-    props.onHide();
-  }
-
-  function handleSubmit(event) {
-    event.preventDefault();
-
-    props.changeNetwork(selectedNetwork);
-    handleClose();
-  }
-
-  function selectNetwork(newValue) {
-    const network = props.networks[newValue.value.replace(/^(favourite-)/,'')];
-    if (network) {
-      setLoading(true);
-      setError(false);
-      network.load().then(() => {
-        setSelectedNetwork(network);
-        if (network.usingDirectory && !network.connectedDirectory()) {
-          throw false;
-        }
-        return network.connect().then(() => {
-          if (network.connected) {
-            setLoading(false);
-          } else {
-            throw false;
-          }
-        });
-      }).catch(error => {
-        console.log(error);
-        setError('Could not connect to this network. Try again later');
-        setLoading(false);
-      });
-    }
-  }
-
-  function selectedOption(){
-    let networks = options.networks
-    if(options.grouped){
-      networks = options.grouped.map(el => el.options).flat()
-    }
-    return networks.find(el => el.value === options.network)
-  }
+  const [show, setShow] = useState(Boolean(props.show));
+  const [query, setQuery] = useState('');
+  const [loadingPath, setLoadingPath] = useState(null);
+  const [error, setError] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (props.show && !show) {
-      handleOpen()
+      handleOpen();
     } else if (!props.show && show) {
-      handleClose()
+      handleClose();
     }
-  }, [props.show])
+  }, [props.show]);
 
   useEffect(() => {
-    const networks = Object.values(props.networks).sort((a, b) => a.name > b.name ? 1 : -1)
-    const networkOptions = networks.map(network => {
-      return {
-        value: network.path,
-        label: network.prettyName,
-        image: network.image,
-        operatorCount: network.operatorCount,
-        authz: network.authzSupport,
-        online: network.online,
-        experimental: network.experimental
-      }
-    })
-    const isFavourite = selectedNetwork && props.favourites && props.favourites.includes(selectedNetwork.path)
-    setOptions({
-      networks: networkOptions,
-      network: isFavourite ? `favourite-${selectedNetwork.path}` : selectedNetwork && selectedNetwork.path,
-      grouped: props.favourites && props.favourites.length > 0 && [
-        {
-          label: 'Favourites',
-          options: networkOptions.filter(el => props.favourites.includes(el.value)).map(el => {
-            return {...el, value: `favourite-${el.value}`}
-          })
-        },
-        {
-          label: 'All Networks',
-          options: networkOptions
+    function onKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (show) {
+          handleClose();
+        } else {
+          handleOpen();
         }
-      ]
-    })
-  }, [props.networks, selectedNetwork, props.favourites])
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [show]);
 
-  const price = props.network?.baseAsset?.prices?.coingecko
+  function handleOpen() {
+    setError(null);
+    setQuery('');
+    setActiveIndex(0);
+    setShow(true);
+    setTimeout(() => inputRef.current?.focus(), 60);
+  }
+
+  function handleClose() {
+    setShow(false);
+    setLoadingPath(null);
+    setError(null);
+    props.onHide && props.onHide();
+  }
+
+  const allNetworks = useMemo(() => {
+    return Object.values(props.networks || {}).sort((a, b) =>
+      a.prettyName.localeCompare(b.prettyName)
+    );
+  }, [props.networks]);
+
+  const filteredNetworks = useMemo(() => {
+    let list = allNetworks;
+    if (query.trim()) {
+      const searcher = new FuzzySearch(list, ['prettyName', 'symbol', 'name', 'keywords'], {
+        sort: true,
+      });
+      list = searcher.search(query.trim());
+    }
+    const favSet = new Set(props.favourites || []);
+    return [...list].sort((a, b) => {
+      const aFav = favSet.has(a.path) ? 0 : 1;
+      const bFav = favSet.has(b.path) ? 0 : 1;
+      if (aFav !== bFav) return aFav - bFav;
+      if (a.online !== b.online) return a.online ? -1 : 1;
+      return 0;
+    });
+  }, [allNetworks, query, props.favourites]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query]);
+
+  async function selectAndSwitch(network) {
+    if (!network || !network.online || loadingPath) return;
+
+    setLoadingPath(network.path);
+    setError(null);
+    try {
+      await network.load();
+      if (network.usingDirectory && !network.connectedDirectory()) {
+        throw new Error('Directory connection unavailable');
+      }
+      await network.connect();
+      if (!network.connected) {
+        throw new Error('Could not connect to any available API servers');
+      }
+      props.changeNetwork(network);
+      handleClose();
+    } catch (err) {
+      console.log(err);
+      setError(`Could not connect to ${network.prettyName}. Try again later.`);
+      setLoadingPath(null);
+    }
+  }
+
+  function handleInputKeyDown(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((prev) => Math.min(prev + 1, Math.max(filteredNetworks.length - 1, 0)));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((prev) => Math.max(prev - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const target = filteredNetworks[activeIndex];
+      if (target) selectAndSwitch(target);
+    }
+  }
+
+  const price = props.network?.baseAsset?.prices?.coingecko;
+  const isTestnet = props.directory?.testnet;
 
   return (
     <>
-      <Button id="network-select-trigger" onClick={handleOpen} variant="outline-secondary" className="d-flex flex-nowrap text-nowrap align-items-center gap-2 text-reset">
+      <button
+        type="button"
+        id="network-select-trigger"
+        onClick={handleOpen}
+        className="rs-chain-trigger"
+        aria-label="Switch network (Cmd+K)"
+      >
         {props.network ? (
           <>
-            <NetworkImage network={props.network} width={28} height={28} alt={props.network.prettyName} className="text-white" />
-            <div className="d-none d-md-flex align-items-baseline gap-2">
-              <span className="h6 mb-0">{props.network.prettyName}</span>
-              {!!price?.usd && (
-                <em className="text-muted small">${price.usd.toLocaleString(undefined, { maximumFractionDigits: 4, minimumFractionDigits: 2 })}</em>
-              )}
-            </div>
-            <div className="d-none d-md-block">
-              {props.network.authzSupport
-                ? <Badge bg={null} className="rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">Authz</Badge>
-                : <Badge bg={null} className="rounded-pill bg-secondary-subtle text-secondary-emphasis border">No Authz</Badge>
-              }
-            </div>
+            <NetworkImage
+              network={props.network}
+              width={22}
+              height={22}
+              alt={props.network.prettyName}
+              className="rounded-circle flex-shrink-0"
+            />
+            <span className="fw-semibold text-truncate" style={{ maxWidth: 130 }}>
+              {props.network.prettyName}
+            </span>
+            {!!price?.usd && (
+              <span className="text-body-secondary small tabular-nums d-none d-lg-inline">
+                ${price.usd.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+              </span>
+            )}
+            <span
+              className={`rs-status-dot d-none d-sm-inline-block ${props.network.authzSupport ? 'bg-success' : 'bg-secondary'}`}
+              title={props.network.authzSupport ? 'Authz supported' : 'No Authz'}
+            />
           </>
         ) : (
-          <div className="d-none d-md-block">
-            <span className="h6 mb-0">Choose a Network</span>
-          </div>
+          <span className="fw-medium">Select Network</span>
         )}
-        <ChevronDown className="text-muted ms-1" size={14} />
-      </Button>
-      <Modal show={show} onHide={handleClose}>
-        <Modal.Header closeButton>
-          <Modal.Title>Change Network</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form onSubmit={handleSubmit}>
-            {props.networks &&
-              <div className="row mb-3">
-                <div className="col">
-                  <div className="d-flex align-content-center">
-                    <div className="flex-fill">
-                      <Select
-                        value={selectedOption()}
-                        isClearable={false}
-                        name="network"
-                        options={options.grouped || options.networks}
-                        onChange={selectNetwork}
-                        formatOptionLabel={network => (
-                          <div className={'d-flex align-items-center' + (!network.online ? ' text-muted' : '')}>
-                            <div className="pe-2">
-                              <NetworkImage network={network} width={30} height={30} alt={network.label} />
-                            </div>
-                            <div className="me-auto">
-                              <span className="ms-1">{network.label} {!network.online && <small>(Offline)</small>}</span>
-                            </div>
-                            <div className="text-end d-none d-sm-block">
-                              {network.restakeSupport && network.operatorCount > 0 &&
-                                <small>{network.operatorCount} Operator{network.operatorCount > 1 ? 's' : ''}</small>
-                              }
-                            </div>
-                            <div className="text-end">
-                              {network.authz
-                                ? <Badge bg={null} className={`ms-3 rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle` + (!network.online ? ' opacity-50' : '')}>Authz</Badge>
-                                : <Badge bg={null} className={`ms-3 rounded-pill bg-secondary-subtle text-secondary-emphasis border` + (!network.online ? ' opacity-50' : '')}>No Authz</Badge>
-                              }
-                            </div>
-                          </div>
-                        )}
-                        styles={{
-                          control: (base, state) => ({
-                            ...base,
-                            backgroundColor: 'var(--bs-body-bg)',
-                            borderColor: state.isFocused ? 'var(--bs-primary)' : 'var(--bs-border-color)',
-                            color: 'var(--bs-body-color)',
-                            boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25)' : 'none',
-                            '&:hover': {
-                              borderColor: state.isFocused ? 'var(--bs-primary)' : 'var(--bs-border-color)',
-                            },
-                          }),
-                          menu: (base) => ({
-                            ...base,
-                            backgroundColor: 'var(--bs-body-bg)',
-                            border: '1px solid var(--bs-border-color)',
-                            color: 'var(--bs-body-color)',
-                            zIndex: 1060,
-                          }),
-                          menuList: (base) => ({
-                            ...base,
-                            backgroundColor: 'var(--bs-body-bg)',
-                          }),
-                          option: (base, state) => ({
-                            ...base,
-                            backgroundColor: state.isSelected || state.isFocused
-                              ? 'var(--bs-tertiary-bg)'
-                              : 'var(--bs-body-bg)',
-                            color: 'var(--bs-body-color)',
-                            cursor: 'pointer',
-                            ':active': {
-                              backgroundColor: 'var(--bs-tertiary-bg)',
-                            },
-                          }),
-                          input: (base) => ({
-                            ...base,
-                            color: 'var(--bs-body-color)',
-                          }),
-                          singleValue: (base) => ({
-                            ...base,
-                            color: 'var(--bs-body-color)',
-                          }),
-                          placeholder: (base) => ({
-                            ...base,
-                            color: 'var(--bs-secondary-color)',
-                          }),
-                          groupHeading: (base) => ({
-                            ...base,
-                            color: 'var(--bs-secondary-color)',
-                          }),
-                        }}
-                        theme={(theme) => ({
-                          ...theme,
-                          colors: {
-                            ...theme.colors,
-                            neutral0: 'var(--bs-body-bg)',
-                            neutral5: 'var(--bs-tertiary-bg)',
-                            neutral10: 'var(--bs-tertiary-bg)',
-                            neutral20: 'var(--bs-border-color)',
-                            neutral30: 'var(--bs-border-color)',
-                            neutral40: 'var(--bs-secondary-color)',
-                            neutral50: 'var(--bs-secondary-color)',
-                            neutral60: 'var(--bs-body-color)',
-                            neutral70: 'var(--bs-body-color)',
-                            neutral80: 'var(--bs-body-color)',
-                            neutral90: 'var(--bs-body-color)',
-                            primary: 'var(--bs-primary)',
-                            primary25: 'var(--bs-tertiary-bg)',
-                            primary50: 'var(--bs-secondary-bg)',
-                            primary75: 'var(--bs-primary)',
-                          },
-                        })}
-                      />
-                    </div>
-                    {selectedNetwork && (
-                      <Favourite
-                        value={props.favourites.includes(selectedNetwork.path)}
-                        toggle={() => props.toggleFavourite(selectedNetwork)}
-                        onTooltip="Remove favourite network"
-                        offTooltip="Favourite network"
-                        onIcon={BookmarkStarFill}
-                        offIcon={BookmarkStar}
-                        className="text-success align-self-center ms-2"
-                      />
-                    )}
-                  </div>
-                </div>
+        <span className="rs-kbd d-none d-md-inline-flex ms-1">⌘K</span>
+        <ChevronDown className="text-body-secondary flex-shrink-0" size={12} />
+      </button>
+
+      <Modal show={show} onHide={handleClose} centered size="md" contentClassName="border-0 shadow-lg">
+        <Modal.Header closeButton className="pb-2 border-bottom-0">
+          <div className="d-flex align-items-center justify-content-between w-100 me-2">
+            <Modal.Title className="fs-6 fw-semibold">Switch Network</Modal.Title>
+            {props.changeNetworkMode && (
+              <div className="btn-group btn-group-sm" role="group" aria-label="Network environment">
+                <button
+                  type="button"
+                  className={`btn btn-sm ${!isTestnet ? 'btn-primary' : 'btn-outline-secondary'}`}
+                  onClick={() => props.changeNetworkMode('mainnet')}
+                >
+                  <Globe size={12} className="me-1" />Mainnet
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${isTestnet ? 'btn-warning' : 'btn-outline-secondary'}`}
+                  onClick={() => props.changeNetworkMode('testnet')}
+                >
+                  <WrenchAdjustableCircleFill size={12} className="me-1" />Testnet
+                </button>
               </div>
-            }
-            {selectedNetwork && (
-              <>
-                <NetworkChecks network={selectedNetwork} error={error} />
-                <div className="text-center mt-4 mb-2">
-                  {!loading
-                    ? !error && <Button type="submit" className="btn btn-primary btn-lg">Change network</Button>
-                    : (
-                      <Button className="btn-primary btn-lg mr-5" disabled>
-                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>&nbsp;
-                        Updating...
-                      </Button>
-                    )}
-                </div>
-              </>
             )}
-          </Form>
+          </div>
+        </Modal.Header>
+        <Modal.Body className="pt-1">
+          <div className="input-group mb-3">
+            <span className="input-group-text bg-transparent border-end-0 text-body-secondary">
+              <Search size={14} />
+            </span>
+            <input
+              ref={inputRef}
+              type="text"
+              className="form-control border-start-0 border-end-0"
+              placeholder="Search by chain name or ticker..."
+              aria-label="Search networks"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleInputKeyDown}
+            />
+            {query && (
+              <button
+                type="button"
+                className="btn border border-start-0 text-body-secondary"
+                aria-label="Clear search"
+                onClick={() => setQuery('')}
+              >
+                <XCircle size={14} />
+              </button>
+            )}
+          </div>
+
+          {error && <AlertMessage variant="danger" message={error} />}
+
+          <div className="rs-cmd-list d-flex flex-column gap-1">
+            {filteredNetworks.length === 0 ? (
+              <div className="text-center py-4 text-body-secondary small">
+                No networks match "{query}".
+              </div>
+            ) : (
+              filteredNetworks.map((net, idx) => {
+                const isFav = (props.favourites || []).includes(net.path);
+                const isCurrent = props.network?.path === net.path;
+                const isLoading = loadingPath === net.path;
+                const netPrice = net.baseAsset?.prices?.coingecko?.usd;
+                return (
+                  <div
+                    key={net.path}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => selectAndSwitch(net)}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectAndSwitch(net);
+                      }
+                    }}
+                    className={`rs-cmd-item ${idx === activeIndex ? 'is-active' : ''} ${isCurrent ? 'is-current' : ''} ${!net.online ? 'opacity-50' : ''}`}
+                  >
+                    <NetworkImage
+                      network={net}
+                      width={32}
+                      height={32}
+                      alt={net.prettyName}
+                      className="rounded-circle flex-shrink-0"
+                    />
+                    <div className="flex-grow-1 min-w-0">
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="fw-semibold text-truncate">{net.prettyName}</span>
+                        {net.symbol && (
+                          <span className="text-body-secondary small font-mono">{net.symbol}</span>
+                        )}
+                        {!net.online && (
+                          <Badge bg="secondary-subtle" className="text-body-secondary border small">Offline</Badge>
+                        )}
+                      </div>
+                      <div className="d-flex align-items-center gap-2 small text-body-secondary tabular-nums">
+                        {net.estimatedApr ? (
+                          <span>{round(net.estimatedApr * 100, 1)}% APR</span>
+                        ) : null}
+                        {net.restakeSupport && net.operatorCount > 0 ? (
+                          <span>• {net.operatorCount} REStake</span>
+                        ) : (
+                          <span>• Manual</span>
+                        )}
+                        {netPrice ? <span>• ${netPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span> : null}
+                      </div>
+                    </div>
+                    <div className="d-flex align-items-center gap-2 flex-shrink-0">
+                      {isLoading ? (
+                        <Spinner animation="border" size="sm" className="text-primary" />
+                      ) : (
+                        <Badge
+                          bg={null}
+                          className={`rounded-pill ${
+                            net.authzSupport
+                              ? 'bg-success-subtle text-success-emphasis border border-success-subtle'
+                              : 'bg-secondary-subtle text-secondary-emphasis border'
+                          }`}
+                        >
+                          {net.authzSupport ? 'Authz' : 'No Authz'}
+                        </Badge>
+                      )}
+                      {props.toggleFavourite && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-link p-1 text-body-secondary"
+                          aria-label={isFav ? `Remove ${net.prettyName} from favourites` : `Add ${net.prettyName} to favourites`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            props.toggleFavourite(net);
+                          }}
+                        >
+                          {isFav ? <BookmarkStarFill className="text-success" size={15} /> : <BookmarkStar size={15} />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </Modal.Body>
       </Modal>
     </>
   );
 }
 
-export default NetworkSelect
+export default NetworkSelect;

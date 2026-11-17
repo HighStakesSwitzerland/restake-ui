@@ -180,8 +180,30 @@ function GrantModal(props) {
             {state.grantTypeValue === '/cosmos.authz.v1beta1.GenericAuthorization' && (
               <>
                 <Form.Group className="mb-3">
-                  <Form.Label>Message type</Form.Label>
-                  <select className="form-select" name="messageTypeValue" aria-label="Message type" value={state.messageTypeValue} onChange={handleInputChange}>
+                  <Form.Label>Permission Preset</Form.Label>
+                  <div className="row g-2 mb-2">
+                    {[
+                      { label: 'Governance Vote', desc: 'Vote on proposals', type: network.messageType('/cosmos.gov.v1beta1.MsgVote') },
+                      { label: 'Delegate', desc: 'Stake tokens', type: network.messageType('/cosmos.staking.v1beta1.MsgDelegate') },
+                      { label: 'Claim Rewards', desc: 'Withdraw rewards', type: network.messageType('/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward') },
+                      { label: 'Custom', desc: 'Any message type', type: 'Custom' },
+                    ].filter(p => p.type === 'Custom' || availableTypes.includes(p.type)).map((preset) => {
+                      const isSelected = state.messageTypeValue === preset.type;
+                      return (
+                        <div key={preset.label} className="col-6">
+                          <button
+                            type="button"
+                            onClick={() => setState({ ...state, messageTypeValue: preset.type })}
+                            className={`rs-preset-card w-100 h-100 ${isSelected ? 'is-selected' : ''}`}
+                          >
+                            <span className="small fw-semibold">{preset.label}</span>
+                            <span className="text-body-secondary" style={{ fontSize: '0.72rem' }}>{preset.desc}</span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <select className="form-select form-select-sm" name="messageTypeValue" aria-label="Message type" value={state.messageTypeValue} onChange={handleInputChange}>
                     {availableTypes.map(type => {
                       return (
                         <option key={type} value={type}>{_.startCase(type.split('.').slice(-1)[0].replace('Msg', ''))}</option>

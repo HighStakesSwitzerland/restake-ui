@@ -49,12 +49,12 @@ function sortValidatorsList(validators, { network, delegations, operators }) {
   });
 }
 
-function filterAndGroupValidators({ validators, operators, delegations, network, exclude, filter }) {
+function filterAndGroupValidators({ validators, operators, delegations, network, validatorApy, exclude, filter }) {
   const list = exclude
     ? Object.values(omit(validators, ...exclude))
     : Object.values(validators);
 
-  const { keywords, status, group } = filter;
+  const { keywords, status, group, restakeOnly, sort } = filter;
 
   let filtered = status
     ? list.filter(result => {
@@ -68,31 +68,45 @@ function filterAndGroupValidators({ validators, operators, delegations, network,
     filtered = filtered.filter(({ operator_address: address }) => delegations && delegations[address]);
   }
 
-  if (!keywords || keywords === '') {
-    return sortValidatorsList(filtered, { network, delegations, operators });
+  if (restakeOnly && operators) {
+    const opSet = new Set(operators.map(el => el.address));
+    filtered = filtered.filter(({ operator_address: address }) => opSet.has(address));
   }
 
-  const searcher = new FuzzySearch(
-    filtered, ['description.moniker'],
-    { sort: true }
-  );
+  if (keywords && keywords !== '') {
+    const searcher = new FuzzySearch(
+      filtered, ['description.moniker'],
+      { sort: true }
+    );
+    return searcher.search(keywords);
+  }
 
-  return searcher.search(keywords);
+  if (sort === 'apy' && validatorApy) {
+    return [...filtered].sort((a, b) => (validatorApy[b.operator_address] || 0) - (validatorApy[a.operator_address] || 0));
+  }
+  if (sort === 'fee') {
+    return [...filtered].sort((a, b) => (a.commission?.commission_rates?.rate || 0) - (b.commission?.commission_rates?.rate || 0));
+  }
+  if (sort === 'rank') {
+    return [...filtered].sort((a, b) => (a.rank || 9999) - (b.rank || 9999));
+  }
+
+  return sortValidatorsList(filtered, { network, delegations, operators });
 }
 
 function Validators(props) {
-  const { address, wallet, network, validators, operators, delegations, operatorGrants } = props
+  const { address, wallet, network, validators, operators, delegations, operatorGrants, validatorApy } = props
 
   const [filter, setFilter] = useReducer(
     (state, newState) => ({ ...state, ...newState }),
-    {keywords: '', status: 'active', group: 'all'}
+    {keywords: '', status: 'active', group: 'all', restakeOnly: false, sort: 'recommended'}
   )
   const [results, setResults] = useState([])
 
   const showCommission = results && Object.values(results).find(el => el.isValidatorOperator(address))
 
   useEffect(() => {
-    if(delegations && filter.group !== 'delegated'){
+    if(delegations && Object.keys(delegations).length > 0 && filter.group !== 'delegated'){
       return setFilter({ group: 'delegated' })
     }
   }, [Object.keys(delegations || {}).length]);
@@ -100,7 +114,7 @@ function Validators(props) {
   useEffect(() => {
     let filtered = filteredValidators(validators, filter)
     let group = filter.group
-    while(filtered.length < 1 && group !== 'all'){
+    while(filtered.length < 1 && group !== 'all' && !filter.keywords && !filter.restakeOnly){
       group = 'all'
       filtered = filteredValidators(validators, {...filter, group})
       if(filtered.length > 0 || group === 'all'){
@@ -108,7 +122,7 @@ function Validators(props) {
       }
     }
     setResults(filtered)
-  }, [validators, operators, delegations, operatorGrants, filter]);
+  }, [validators, operators, delegations, operatorGrants, validatorApy, filter]);
 
   function filterValidators(event){
     setFilter({keywords: event.target.value})
@@ -120,6 +134,7 @@ function Validators(props) {
       operators,
       delegations,
       network,
+      validatorApy,
       exclude: props.exclude,
       filter
     });
@@ -355,16 +370,51 @@ function Validators(props) {
           onSelect={(e) => setFilter({ group: e })}
         >
           <Nav.Item>
-            <Nav.Link eventKey="delegated" disabled={filteredValidators(validators, { ...filter, group: 'delegated' }).length < 1}>My Delegations</Nav.Link>
+            <Nav.Link eventKey="delegated" disabled={filteredValidators(validators, { ...filter, group: 'delegated', restakeOnly: false }).length < 1}>
+              My Delegations
+              {Object.keys(delegations || {}).length > 0 && (
+                <span className="opacity-75 ms-1">({Object.keys(delegations).length})</span>
+              )}
+            </Nav.Link>
           </Nav.Item>
           <Nav.Item>
-            <Nav.Link eventKey="all">All Validators</Nav.Link>
+            <Nav.Link eventKey="all">
+              All Validators
+              <span className="opacity-75 ms-1">({Object.keys(validators || {}).length})</span>
+            </Nav.Link>
           </Nav.Item>
         </Nav>
-        <div className="d-flex justify-content-end">
+        <div className="d-flex flex-wrap align-items-center justify-content-end gap-2 ms-auto">
+          {operators?.length > 0 && (
+            <div className="form-check form-switch mb-0 me-1">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                role="switch"
+                id="restake-only-switch"
+                checked={filter.restakeOnly}
+                onChange={(e) => setFilter({ restakeOnly: e.target.checked })}
+              />
+              <label className="form-check-label small fw-medium text-nowrap" htmlFor="restake-only-switch">
+                REStake Only
+              </label>
+            </div>
+          )}
+          <select
+            id="validator-sort-filter"
+            className="form-select form-select-sm w-auto"
+            aria-label="Sort validators"
+            value={filter.sort}
+            onChange={(e) => setFilter({ sort: e.target.value })}
+          >
+            <option value="recommended">Sort: Recommended</option>
+            {network.apyEnabled && <option value="apy">Sort: Highest APY</option>}
+            <option value="fee">Sort: Lowest Fee</option>
+            <option value="rank">Sort: Rank</option>
+          </select>
           <select
             id="validator-status-filter"
-            className="form-select w-auto h-auto"
+            className="form-select form-select-sm w-auto"
             aria-label="Validator status"
             value={filter.status}
             onChange={(e) => setFilter({ status: e.target.value })}
@@ -477,7 +527,7 @@ function Validators(props) {
           <Button
             variant="outline-secondary"
             size="sm"
-            onClick={() => setFilter({ keywords: '', status: 'all', group: 'all' })}
+            onClick={() => setFilter({ keywords: '', status: 'all', group: 'all', restakeOnly: false, sort: 'recommended' })}
           >
             Reset filters
           </Button>

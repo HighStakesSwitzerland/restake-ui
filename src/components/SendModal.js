@@ -152,6 +152,13 @@ function SendModal(props) {
     return props.favouriteAddresses.filter(el => el.address !== props.address)
   }
 
+  function setPercentageAmount(fraction) {
+    if (!balance?.amount || !asset) return;
+    const decimals = pow(10, asset.decimals || 6);
+    const amount = divide(multiply(bignumber(balance.amount), fraction), decimals);
+    setState({ ...state, amountValue: format(amount, { notation: 'fixed' }) });
+  }
+
   return (
     <>
       <Modal show={show} onHide={handleClose}>
@@ -188,7 +195,23 @@ function SendModal(props) {
           {recipient() && (
             <>
               <Form.Group className="mb-3">
-                <Form.Label>Amount</Form.Label>
+                <div className="d-flex align-items-center justify-content-between mb-1">
+                  <Form.Label className="mb-0">Amount</Form.Label>
+                  {balance && (
+                    <div className="d-flex align-items-center gap-1">
+                      {[0.25, 0.5, 0.75, 1].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          className="rs-chip-btn"
+                          onClick={() => setPercentageAmount(pct)}
+                        >
+                          {pct === 1 ? 'Max' : `${pct * 100}%`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="mb-3">
                   <div className="input-group">
                     <Form.Control name="amountValue" type="number" min={0} step={step} placeholder="10" required={true} isInvalid={!validAmount()} value={state.amountValue} onChange={handleInputChange} />

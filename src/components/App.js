@@ -579,227 +579,249 @@ class App extends React.Component {
   }
 
   render() {
+    const isViewingOther = this.state.address && !this.viewingWallet();
+    const granterGrants = this.state.wallet?.grants?.filter(g => g.granter === this.state.address) || [];
+    const grantedActions = _.uniq(granterGrants.map(g => {
+      const msg = g.authorization?.msg || g.authorization?.['@type'] || '';
+      return msg.split('.').slice(-1)[0].replace('Msg', '');
+    })).filter(Boolean);
+
     return (
-      <Container fluid="xl">
-        <header className="rs-header">
-          <div className="d-flex justify-content-between align-items-center gap-3 py-3 border-bottom">
-            <div className="logo d-flex align-items-end text-reset text-decoration-none">
-              <span onClick={() => this.props.setActive('networks')} role="button" className="text-reset text-decoration-none">
-                {this.props.theme === 'light'
-                  ? (
-                    <img src={Logo} srcSet={`${Logo2x} 2x, ${Logo3x} 3x`} alt="REStake" />
-                  ) : (
-                    <img src={LogoWhite} srcSet={`${LogoWhite2x} 2x, ${LogoWhite3x} 3x`} alt="REStake" />
-                  )}
-              </span>
-              {this.props.directory.testnet && (
-                <small className="ms-2 text-muted">testnet</small>
-              )}
-            </div>
-            <div className="d-flex align-items-center text-reset text-decoration-none flex-shrink-0">
-              {this.networkIcon()}
-              {this.themeIcon()}
-              <NetworkSelect show={this.state.showNetworkSelect} onHide={() => { this.setState({ showNetworkSelect: false }) }} networks={this.props.networks}
-                network={this.props.network}
-                favourites={this.state.favourites || []}
-                validators={this.props.validators}
-                changeNetwork={this.props.changeNetwork}
-                toggleFavourite={this.toggleFavourite}
-              />
-            </div>
-          </div>
-          <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-1 border-bottom">
-            <Navbar className={`navbar navbar-expand ${this.props.theme === 'dark' ? 'navbar-dark' : 'navbar-light'} me-2 py-1`}>
-              <div className="justify-content-center">
-                <Nav activeKey={this.props.active} onSelect={(e) => this.props.setActive(e)}>
-                  <div className="nav-item pe-2 border-end text-center">
-                    <Nav.Link id="nav-explore" eventKey="networks">
-                      <Stars className="mb-1 me-1" /><span className="d-none d-sm-inline"> Explore</span>
-                    </Nav.Link>
-                  </div>
-                  {this.props.network && (
-                    <>
-                      <div className="nav-item px-2 border-end text-center">
-                        <Nav.Link id="nav-stake" eventKey="delegations">
-                          <CoinIcon className="mb-1 me-1" /><span className="d-none d-sm-inline"> Stake</span>
-                        </Nav.Link>
-                      </div>
-                      <div className="nav-item px-2 border-end text-center">
-                        <Nav.Link id="nav-vote" eventKey="voting">
-                          <EnvelopePaper className="mb-1 me-1" /><span className="d-none d-sm-inline"> Vote</span>
-                        </Nav.Link>
-                      </div>
-                      {this.state.address && this.props.network.authzSupport && (
-                        <div className="nav-item px-2 border-end text-center">
-                          <Nav.Link id="nav-grant" eventKey="grants">
-                            <Magic className="mb-1 me-1" /><span className="d-none d-sm-inline"> Grant</span>
-                          </Nav.Link>
-                        </div>
+      <>
+        <header className="rs-command-bar">
+          <Container fluid="xl">
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
+              <div className="d-flex align-items-center gap-2 gap-md-3">
+                <div className="logo d-flex align-items-center text-reset text-decoration-none">
+                  <span onClick={() => this.props.setActive('networks')} role="button" className="text-reset text-decoration-none d-flex align-items-center">
+                    {this.props.theme === 'light'
+                      ? (
+                        <img src={Logo} srcSet={`${Logo2x} 2x, ${Logo3x} 3x`} alt="REStake" style={{ height: 28, width: 'auto' }} />
+                      ) : (
+                        <img src={LogoWhite} srcSet={`${LogoWhite2x} 2x, ${LogoWhite3x} 3x`} alt="REStake" style={{ height: 28, width: 'auto' }} />
                       )}
-                      {!this.props.directory.testnet && (
-                        <div className="nav-item px-2 text-center">
-                          <Nav.Link id="nav-swap" eventKey="swap">
-                            <CurrencyExchange className="mb-1 me-1" /><span className="d-none d-sm-inline"> Swap</span>
-                          </Nav.Link>
-                        </div>
-                      )}
-                    </>
+                  </span>
+                  {this.props.directory.testnet && (
+                    <span className="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-2 small">testnet</span>
                   )}
-                </Nav>
+                </div>
+
+                <NetworkSelect
+                  show={this.state.showNetworkSelect}
+                  onHide={() => { this.setState({ showNetworkSelect: false }) }}
+                  networks={this.props.networks}
+                  network={this.props.network}
+                  favourites={this.state.favourites || []}
+                  validators={this.props.validators}
+                  directory={this.props.directory}
+                  changeNetworkMode={this.props.changeNetworkMode}
+                  changeNetwork={this.props.changeNetwork}
+                  toggleFavourite={this.toggleFavourite}
+                />
               </div>
-            </Navbar>
-            <nav className={`navbar navbar-expand ${this.props.theme === 'dark' ? 'navbar-dark' : 'navbar-light'} py-1 ms-auto`}>
-              <div className="justify-content-end">
-                <ul className="navbar-nav align-items-center flex-wrap gap-1">
-                  {this.props.network && (
-                    <>
-                      {(this.state.wallet || this.favouriteAddresses().length > 0) && (
-                        <li className="nav-item pe-2 pe-md-3 border-end d-flex align-items-center">
-                          {this.state.address && (
-                            <>
-                              <span className="d-none d-md-inline pe-2">
+
+              <Nav activeKey={this.props.active} onSelect={(e) => this.props.setActive(e)} className="rs-nav-segmented order-3 order-lg-2 mx-auto mx-lg-0">
+                <Nav.Item>
+                  <Nav.Link id="nav-explore" eventKey="networks">
+                    <Stars size={14} /><span className="d-none d-sm-inline">Explore</span>
+                  </Nav.Link>
+                </Nav.Item>
+                {this.props.network && (
+                  <>
+                    <Nav.Item>
+                      <Nav.Link id="nav-stake" eventKey="delegations">
+                        <CoinIcon size={14} /><span className="d-none d-sm-inline">Stake</span>
+                      </Nav.Link>
+                    </Nav.Item>
+                    <Nav.Item>
+                      <Nav.Link id="nav-vote" eventKey="voting">
+                        <EnvelopePaper size={14} /><span className="d-none d-sm-inline">Vote</span>
+                      </Nav.Link>
+                    </Nav.Item>
+                    {this.state.address && this.props.network.authzSupport && (
+                      <Nav.Item>
+                        <Nav.Link id="nav-grant" eventKey="grants">
+                          <Magic size={14} /><span className="d-none d-sm-inline">Grants</span>
+                        </Nav.Link>
+                      </Nav.Item>
+                    )}
+                    {!this.props.directory.testnet && (
+                      <Nav.Item>
+                        <Nav.Link id="nav-swap" eventKey="swap">
+                          <CurrencyExchange size={14} /><span className="d-none d-sm-inline">Swap</span>
+                        </Nav.Link>
+                      </Nav.Item>
+                    )}
+                  </>
+                )}
+              </Nav>
+
+              <div className="d-flex align-items-center gap-2 order-2 order-lg-3 flex-shrink-0">
+                {this.themeIcon()}
+                {this.props.network && (
+                  <Dropdown as={ButtonGroup}>
+                    <Dropdown.Toggle id="connect-wallet-btn" variant={null} className="rs-wallet-pill">
+                      {this.state.address ? (
+                        <>
+                          {this.viewingWallet() ? <Key size={14} className="text-primary" /> : <Eye size={14} className="text-warning" />}
+                          <span className="fw-semibold text-truncate" style={{ maxWidth: 120 }}>
+                            {this.addressName()}
+                          </span>
+                          {this.state.balance ? (
+                            <span className="text-body-secondary small tabular-nums d-none d-md-inline border-start ps-2">
+                              <Coin
+                                {...this.state.balance}
+                                asset={this.props.network.baseAsset}
+                                showValue={false}
+                                showImage={false}
+                              />
+                            </span>
+                          ) : (
+                            <Spinner animation="border" role="status" className="spinner-border-sm text-secondary" />
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <CashCoin size={15} className="text-primary" />
+                          <span>Connect Wallet</span>
+                        </>
+                      )}
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu align="end" style={{ minWidth: 260 }}>
+                      {this.state.address && (
+                        <>
+                          <div className="px-3 py-2 border-bottom">
+                            <div className="d-flex align-items-center justify-content-between gap-2">
+                              <span className="small fw-semibold text-truncate">{this.addressName()}</span>
+                              <div className="d-flex align-items-center gap-2">
                                 <Favourite
                                   value={this.favouriteAddresses().some(el => el['address'] === this.state.address)}
                                   toggle={() => this.toggleFavouriteAddress(this.state.address, this.viewingWallet() && this.state.wallet?.name)}
                                   onTooltip="Remove saved address"
                                   offTooltip="Save address"
                                 />
-                              </span>
-                              <span>
-                                {this.viewingWallet() ? (
-                                  <TooltipIcon tooltip="Viewing your wallet" rootClose={true}>
-                                    <span role="button" onClick={() => this.showWalletModal({ activeTab: 'wallet' })}>
-                                      <Key />
-                                    </span>
-                                  </TooltipIcon>
-                                ) : (
-                                  <TooltipIcon tooltip="Viewing saved address" rootClose={true}>
-                                    <span role="button" onClick={() => this.showWalletModal({ activeTab: 'saved' })}>
-                                      <Eye />
-                                    </span>
-                                  </TooltipIcon>
-                                )}
-                              </span>
-                            </>
-                          )}
-                          {this.otherFavouriteAddresses().length < 1 && this.state.wallet ? (
-                            <span role="button" onClick={() => this.showWalletModal({ activeTab: 'wallet' })} className="small d-none d-lg-inline ms-2 text-truncate" style={{maxWidth: 160}}>{this.state.wallet.name || truncateAddress(this.state.wallet.address)}</span>
-                          ) : (
-                            <select className="form-select form-select-sm d-none d-lg-block ms-2" aria-label="Address" value={this.state.address || ''} onChange={(e) => this.setState({ address: e.target.value })} style={{maxWidth: 185}}>
-                              {this.state.wallet ? (
-                                <optgroup label={this.state.wallet.signerProvider.label}>
-                                  <option value={this.state.wallet.address}>{this.state.wallet.name || truncateAddress(this.state.wallet.address)}</option>
-                                </optgroup>
-                              ) : (
-                                <option value="">Choose address</option>
-                              )}
-                              <optgroup label="Saved">
-                                {this.otherFavouriteAddresses().map(({ address, label }) => {
-                                  return <option key={address} value={address}>{label || truncateAddress(address)}</option>
-                                })}
-                              </optgroup>
-                            </select>
-                          )}
-                          {this.state.address && (
-                            <span className="d-none d-md-inline ms-2">
-                              <TooltipIcon tooltip="Copy address" rootClose={true}>
-                                <span>
-                                  <CopyToClipboard text={this.state.address}
-                                    onCopy={() => this.setCopied()}>
-                                    <span role="button" className="d-flex align-items-center">{this.state.copied ? <ClipboardCheck /> : <Clipboard />}</span>
-                                  </CopyToClipboard>
-                                </span>
-                              </TooltipIcon>
-                            </span>
-                          )}
-                        </li>
-                      )}
-                      {this.state.address && (
-                      <li className="nav-item px-2 px-md-3 border-end align-items-center d-none d-md-flex">
-                        <div role="button" onClick={() => this.showWalletModal({activeTab: this.state.wallet ? 'wallet' : 'saved'})}>
-                          {this.state.balance ? (
-                            <Coin
-                              {...this.state.balance}
-                              asset={this.props.network.baseAsset}
-                              className="small text-end"
-                              showImage={false}
-                            />
-                          ) : (
-                            <Spinner animation="border" role="status" className="spinner-border-sm text-secondary">
-                              <span className="visually-hidden">Loading...</span>
-                            </Spinner>
-                          )}
-                        </div>
-                      </li>
-                      )}
-                      <li className="nav-item ps-2 ps-md-3 d-flex align-items-center">
-                        <Dropdown as={ButtonGroup}>
-                          <Dropdown.Toggle id="connect-wallet-btn" size="sm" className="rounded">
-                            {this.state.address ? (
-                              <>
-                                <CashCoin className="me-1" />
-                              </>
-                            ) : 'Connect'}
-                          </Dropdown.Toggle>
-                          <Dropdown.Menu>
-                            {this.state.address && (
-                              <div className="d-block d-md-none">
-                                <Dropdown.Header className="text-truncate">{this.addressName()}</Dropdown.Header>
-                                <Dropdown.Item as="button" onClick={() => this.showWalletModal({activeTab: this.state.wallet ? 'wallet' : 'saved'})}>
-                                  <Coin
-                                    {...this.state.balance}
-                                    asset={this.props.network.baseAsset}
-                                    className="small"
-                                    showImage={false}
-                                  />
-                                </Dropdown.Item>
-                                <Dropdown.Divider />
+                                <CopyToClipboard text={this.state.address} onCopy={() => this.setCopied()}>
+                                  <span role="button" className="text-body-secondary d-flex align-items-center" title="Copy address">
+                                    {this.state.copied ? <ClipboardCheck className="text-success" size={14} /> : <Clipboard size={14} />}
+                                  </span>
+                                </CopyToClipboard>
+                              </div>
+                            </div>
+                            <div className="font-mono small text-body-secondary">{truncateAddress(this.state.address)}</div>
+                            {this.state.balance && (
+                              <div className="small fw-medium mt-1 tabular-nums">
+                                <Coin
+                                  {...this.state.balance}
+                                  asset={this.props.network.baseAsset}
+                                  showImage={false}
+                                />
                               </div>
                             )}
-                            {this.state.wallet ? (
-                              <>
-                                <Dropdown.Item
-                                  as="button"
-                                  disabled={!this.state.wallet?.hasPermission(this.state.address, 'Send')}
-                                  onClick={() => this.setState({ showSendModal: true })}
-                                >
-                                  Send {this.props.network.symbol}
-                                </Dropdown.Item>
-                              </>
-                            ) : (
-                              <>
-                                {this.signerProviders.map(provider => {
-                                  if(!provider.visible) return null
-                                  const disabledWallets = this.props.network?.disabledWallets || []
-                                  return <Dropdown.Item as="button" key={provider.name} onClick={() => this.connect(provider.name, true)} disabled={!provider.available() || disabledWallets.includes(provider.name)}>Connect {provider.label}</Dropdown.Item>
-                                })}
-                                <Dropdown.Divider />
-                              </>
-                            )}
-                            <Dropdown.Item as="button" onClick={() => this.showWalletModal({ activeTab: 'saved' })}>Saved Addresses</Dropdown.Item>
-                            {this.state.address && (
-                              <>
-                                <Dropdown.Divider />
-                                <Dropdown.Item as="button" onClick={this.disconnect}>{this.state.wallet ? `Disconnect ${this.state.wallet.signerProvider?.label}` : 'Close'}</Dropdown.Item>
-                              </>
-                            )}
-                          </Dropdown.Menu>
-                        </Dropdown>
-                      </li>
-                    </>
-                  )}
-                </ul>
+                          </div>
+                        </>
+                      )}
+                      {this.state.wallet ? (
+                        <>
+                          <Dropdown.Item as="button" onClick={() => this.showWalletModal({ activeTab: 'wallet' })}>
+                            Wallet & Balances
+                          </Dropdown.Item>
+                          <Dropdown.Item
+                            as="button"
+                            disabled={!this.state.wallet?.hasPermission(this.state.address, 'Send')}
+                            onClick={() => this.setState({ showSendModal: true })}
+                          >
+                            Send {this.props.network.symbol}
+                          </Dropdown.Item>
+                        </>
+                      ) : (
+                        <>
+                          <Dropdown.Header>Connect Provider</Dropdown.Header>
+                          {this.signerProviders.map(provider => {
+                            if(!provider.visible) return null
+                            const disabledWallets = this.props.network?.disabledWallets || []
+                            return <Dropdown.Item as="button" key={provider.name} onClick={() => this.connect(provider.name, true)} disabled={!provider.available() || disabledWallets.includes(provider.name)}>Connect {provider.label}</Dropdown.Item>
+                          })}
+                          <Dropdown.Divider />
+                        </>
+                      )}
+                      {this.otherFavouriteAddresses().length > 0 && (
+                        <>
+                          <Dropdown.Divider />
+                          <Dropdown.Header>Switch to Saved Address</Dropdown.Header>
+                          {this.state.wallet && this.state.address !== this.state.wallet.address && (
+                            <Dropdown.Item as="button" onClick={() => this.setState({ address: this.state.wallet.address })}>
+                              <Key size={13} className="me-2 text-primary" />
+                              {this.state.wallet.name || truncateAddress(this.state.wallet.address)} (My Wallet)
+                            </Dropdown.Item>
+                          )}
+                          {this.otherFavouriteAddresses().map(({ address, label }) => (
+                            <Dropdown.Item
+                              as="button"
+                              key={address}
+                              active={this.state.address === address}
+                              onClick={() => this.setState({ address })}
+                            >
+                              <Eye size={13} className="me-2 text-body-secondary" />
+                              {label || truncateAddress(address)}
+                            </Dropdown.Item>
+                          ))}
+                        </>
+                      )}
+                      <Dropdown.Divider />
+                      <Dropdown.Item as="button" onClick={() => this.showWalletModal({ activeTab: 'saved' })}>
+                        Manage Saved Addresses...
+                      </Dropdown.Item>
+                      {this.state.address && (
+                        <>
+                          <Dropdown.Divider />
+                          <Dropdown.Item as="button" className="text-danger" onClick={this.disconnect}>
+                            {this.state.wallet ? `Disconnect ${this.state.wallet.signerProvider?.label}` : 'Close Watch Mode'}
+                          </Dropdown.Item>
+                        </>
+                      )}
+                    </Dropdown.Menu>
+                  </Dropdown>
+                )}
               </div>
-            </nav>
-          </div>
-        </header>
-        <main className="my-4" id="main-content">
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-2 pb-3 mb-4 border-bottom">
-            <div>
-              <h1 className="h4 fw-semibold mb-1">{this.pageTitle()}</h1>
-              <p className="text-body-secondary small mb-0">{this.introText()}</p>
             </div>
-          </div>
+          </Container>
+        </header>
+        <Container fluid="xl">
+          <main className="my-4" id="main-content">
+            {isViewingOther && (
+              <div className="rs-proxy-banner" role="status">
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  <Eye size={16} className="text-primary flex-shrink-0" />
+                  <span>
+                    <strong>{this.state.wallet ? 'Watch / Authz Proxy Mode:' : 'Watch-Only Mode:'}</strong>{' '}
+                    Viewing <span className="fw-semibold">{this.addressName()}</span>{' '}
+                    <span className="font-mono text-body-secondary">({truncateAddress(this.state.address)})</span>
+                  </span>
+                  {this.state.wallet && (
+                    <span className="badge bg-body text-body border">
+                      {grantedActions.length > 0
+                        ? `Authz: ${grantedActions.join(', ')}`
+                        : 'Read-only (No Authz grants)'}
+                    </span>
+                  )}
+                </div>
+                {this.state.wallet && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={() => this.setState({ address: this.state.wallet.address })}
+                  >
+                    Return to My Wallet
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-2 pb-3 mb-4 border-bottom">
+              <div>
+                <h1 className="h4 fw-semibold mb-1">{this.pageTitle()}</h1>
+                <p className="text-body-secondary small mb-0">{this.introText()}</p>
+              </div>
+            </div>
           {this.props.network?.experimental && this.props.active !== 'networks' && (
             <AlertMessage variant="info" dismissible={false}>
               This network was added to REStake automatically and has not been thoroughly tested yet. <a href="https://github.com/eco-stake/restake-ui/issues" target="_blank" rel="noopener noreferrer">Raise an issue</a> if you have any problems.
@@ -928,6 +950,7 @@ class App extends React.Component {
           />
         )}
       </Container>
+      </>
     )
   }
 }

@@ -1,5 +1,6 @@
 import React from "react";
 import _ from "lodash";
+import moment from "moment";
 import { larger, largerEq, bignumber, add } from 'mathjs'
 import AlertMessage from "./AlertMessage";
 import ClaimRewards from "./ClaimRewards";
@@ -9,10 +10,14 @@ import AboutLedger from "./AboutLedger";
 import {
   Button,
   Dropdown,
+  Spinner,
 } from "react-bootstrap";
-import { Gear } from "react-bootstrap-icons";
+import { Gear, LightningChargeFill } from "react-bootstrap-icons";
 
-import { authzSupportMessage, parseGrants, rewardAmount } from "../utils/Helpers.mjs";
+import { authzSupportMessage, execableMessage, parseGrants, rewardAmount } from "../utils/Helpers.mjs";
+import { MsgGrant } from "../messages/MsgGrant.mjs";
+import { StakeAuthorization } from "../messages/authorizations/StakeAuthorization.mjs";
+import { GenericAuthorization } from "../messages/authorizations/GenericAuthorization.mjs";
 import Coin from "./Coin";
 import Validators from "./Validators";
 
@@ -436,6 +441,50 @@ class Delegations extends React.Component {
     return props
   }
 
+  async enableAllRestake(pendingOperators) {
+    const { network, wallet, address } = this.props;
+    if (!wallet || !address || !pendingOperators.length) return;
+
+    this.setState({ batchGrantLoading: true, error: null });
+    const expiry = moment().add(1, 'year');
+    const genericGrantOnly = wallet.signAminoSupportOnly() && network.authzAminoGenericOnly;
+
+    const messages = pendingOperators.map((operator) => {
+      const authorization = genericGrantOnly
+        ? new GenericAuthorization({ msg: '/cosmos.staking.v1beta1.MsgDelegate' })
+        : new StakeAuthorization({
+            allowList: { address: [operator.address] },
+            authorizationType: 1,
+          });
+      return new MsgGrant({
+        granter: address,
+        grantee: operator.botAddress,
+        grant: {
+          authorization,
+          expiration: expiry.unix(),
+        },
+      });
+    });
+
+    try {
+      await wallet.signAndBroadcast(execableMessage(messages, wallet.address, address));
+      pendingOperators.forEach((operator) => {
+        this.onGrant(operator.botAddress, {
+          grantee: operator.botAddress,
+          granter: address,
+          expiration: expiry,
+          authorization: genericGrantOnly
+            ? { '@type': '/cosmos.authz.v1beta1.GenericAuthorization', msg: '/cosmos.staking.v1beta1.MsgDelegate' }
+            : { '@type': '/cosmos.staking.v1beta1.StakeAuthorization', allow_list: { address: [operator.address] } },
+        });
+      });
+      this.setState({ batchGrantLoading: false });
+    } catch (error) {
+      console.log('Failed to batch grant:', error);
+      this.setState({ batchGrantLoading: false, error: 'Failed to enable REStake: ' + error.message });
+    }
+  }
+
   render() {
     if (!this.props.validators) {
       return (
@@ -471,6 +520,9 @@ class Delegations extends React.Component {
     const operatorGrants = this.operatorGrants();
     const delegatedOperators = this.props.operators.filter(
       (operator) => this.state.delegations?.[operator.address] && operatorGrants?.[operator.botAddress]?.grantsValid
+    );
+    const pendingRestakeOperators = this.props.operators.filter(
+      (operator) => this.state.delegations?.[operator.address] && !operatorGrants?.[operator.botAddress]?.grantsValid
     );
     const delegatedCount = Object.keys(this.state.delegations || {}).length;
     const totalRewards = this.totalRewards();
@@ -508,51 +560,8 @@ class Delegations extends React.Component {
       </>
     );
 
-    const allRewardsDropdown = this.state.rewards && (
-      !this.state.claimLoading && !this.isLoading('rewards') ? (
-        <Dropdown>
-          <Dropdown.Toggle
-            variant="primary"
-            size="sm"
-            id="claim-dropdown"
-          >
-            All Rewards
-          </Dropdown.Toggle>
-
-          <Dropdown.Menu align="end">
-            <ClaimRewards
-              network={this.props.network}
-              address={this.props.address}
-              wallet={this.props.wallet}
-              rewards={Object.values(this.state.rewards || {})}
-              onClaimRewards={this.onClaimRewards}
-              setLoading={this.setClaimLoading}
-              setError={this.setError}
-            />
-            <ClaimRewards
-              disabled={!totalRewards?.amount}
-              restake={true}
-              network={this.props.network}
-              address={this.props.address}
-              wallet={this.props.wallet}
-              rewards={Object.values(this.state.rewards || {})}
-              onClaimRewards={this.onClaimRewards}
-              setLoading={this.setClaimLoading}
-              setError={this.setError}
-            />
-          </Dropdown.Menu>
-        </Dropdown>
-      ) : (
-        <Button variant="secondary" size="sm" disabled aria-label="Loading rewards actions">
-          <span
-            className="spinner-border spinner-border-sm"
-            role="status"
-            aria-hidden="true"
-          ></span>
-          &nbsp;
-        </Button>
-      )
-    );
+    const rewardsList = Object.values(this.state.rewards || {});
+    const rewardActionsBusy = this.state.claimLoading || this.isLoading('rewards');
 
     return (
       <>
@@ -560,8 +569,8 @@ class Delegations extends React.Component {
         {this.props.address && (
           <div className="row g-3 mb-4" aria-label="Staking portfolio summary">
             <div className="col-12 col-md-4">
-              <div className="card h-100">
-                <div className="card-body py-3">
+              <div className="rs-stat-card h-100 d-flex flex-column justify-content-between">
+                <div>
                   <div className="text-body-secondary small text-uppercase fw-semibold mb-1">Total Staked</div>
                   {this.isLoading('delegations') ? (
                     <div className="rs-skeleton" style={{ height: '1.5rem', width: '60%' }} />
@@ -576,11 +585,24 @@ class Delegations extends React.Component {
                     </div>
                   )}
                 </div>
+                {this.props.balance && (
+                  <div className="small text-body-secondary mt-2 pt-2 border-top d-flex justify-content-between tabular-nums">
+                    <span>Available</span>
+                    <Coin
+                      {...this.props.balance}
+                      asset={this.props.network.baseAsset}
+                      precision={3}
+                      showValue={false}
+                      showImage={false}
+                    />
+                  </div>
+                )}
               </div>
             </div>
+
             <div className="col-12 col-md-4">
-              <div className="card h-100">
-                <div className="card-body py-3">
+              <div className="rs-stat-card h-100 d-flex flex-column justify-content-between">
+                <div>
                   <div className="text-body-secondary small text-uppercase fw-semibold mb-1">Pending Rewards</div>
                   {this.isLoading('rewards') ? (
                     <div className="rs-skeleton" style={{ height: '1.5rem', width: '55%' }} />
@@ -595,25 +617,97 @@ class Delegations extends React.Component {
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-            <div className="col-12 col-md-4">
-              <div className="card h-100">
-                <div className="card-body py-3 d-flex align-items-center justify-content-between gap-2">
-                  <div>
-                    <div className="text-body-secondary small text-uppercase fw-semibold mb-1">REStake Status</div>
-                    {this.isLoading('delegations') || this.isLoading('grants') ? (
-                      <div className="rs-skeleton" style={{ height: '1.5rem', width: '110px' }} />
+                {this.state.rewards && (
+                  <div className="d-flex flex-wrap gap-2 mt-2 pt-2 border-top">
+                    {rewardActionsBusy ? (
+                      <Button variant="secondary" size="sm" disabled>
+                        <Spinner animation="border" size="sm" className="me-1" /> Processing...
+                      </Button>
                     ) : (
-                      <div className="fs-6 fw-semibold tabular-nums">
-                        {this.restakeSupport()
-                          ? `${delegatedOperators.length} / ${delegatedCount} Active`
-                          : 'Manual Only'}
-                      </div>
+                      <>
+                        <ClaimRewards
+                          button={true}
+                          variant="outline-secondary"
+                          size="sm"
+                          buttonText="Claim"
+                          disabled={!rewardsList.length}
+                          network={this.props.network}
+                          address={this.props.address}
+                          wallet={this.props.wallet}
+                          rewards={rewardsList}
+                          onClaimRewards={this.onClaimRewards}
+                          setLoading={this.setClaimLoading}
+                          setError={this.setError}
+                        />
+                        <ClaimRewards
+                          button={true}
+                          variant="primary"
+                          size="sm"
+                          buttonText="Compound All"
+                          disabled={!totalRewards?.amount}
+                          restake={true}
+                          network={this.props.network}
+                          address={this.props.address}
+                          wallet={this.props.wallet}
+                          rewards={rewardsList}
+                          onClaimRewards={this.onClaimRewards}
+                          setLoading={this.setClaimLoading}
+                          setError={this.setError}
+                        />
+                      </>
                     )}
                   </div>
-                  {allRewardsDropdown}
+                )}
+              </div>
+            </div>
+
+            <div className="col-12 col-md-4">
+              <div className="rs-stat-card h-100 d-flex flex-column justify-content-between">
+                <div>
+                  <div className="text-body-secondary small text-uppercase fw-semibold mb-1">Auto-Compound Health</div>
+                  {this.isLoading('delegations') || this.isLoading('grants') ? (
+                    <div className="rs-skeleton" style={{ height: '1.5rem', width: '110px' }} />
+                  ) : (
+                    <div className="fs-5 fw-semibold tabular-nums">
+                      {this.restakeSupport()
+                        ? `${delegatedOperators.length} / ${delegatedCount} Active`
+                        : 'Manual Only'}
+                    </div>
+                  )}
                 </div>
+                {this.restakeSupport() && !this.isLoading('delegations') && !this.isLoading('grants') && (
+                  <div className="mt-2 pt-2 border-top d-flex align-items-center justify-content-between gap-2">
+                    {pendingRestakeOperators.length > 0 && this.restakePossible() && this.props.wallet?.hasPermission(this.props.address, 'Grant') ? (
+                      <>
+                        <span className="small text-body-secondary">
+                          {pendingRestakeOperators.length} eligible
+                        </span>
+                        <Button
+                          variant="success"
+                          size="sm"
+                          disabled={this.state.batchGrantLoading}
+                          onClick={() => this.enableAllRestake(pendingRestakeOperators)}
+                          className="d-inline-flex align-items-center gap-1"
+                        >
+                          {this.state.batchGrantLoading ? (
+                            <Spinner animation="border" size="sm" />
+                          ) : (
+                            <LightningChargeFill size={12} />
+                          )}
+                          Enable All ({pendingRestakeOperators.length})
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="small text-body-secondary">
+                        {delegatedCount === 0
+                          ? 'Delegate to a REStake operator to automate'
+                          : delegatedOperators.length === delegatedCount
+                            ? 'All delegations auto-compounding'
+                            : 'Validators pay transaction fees'}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -697,8 +791,8 @@ class Delegations extends React.Component {
                       </Dropdown.Menu>
                     </Dropdown>
                   ) : (
-                    <Button variant="primary" size="sm" onClick={() => this.showValidatorModal(validator)}>
-                      View
+                    <Button variant="primary" size="sm" onClick={() => this.showValidatorModal(validator, { activeTab: 'stake' })}>
+                      Stake
                     </Button>
                   )
                 ) : (

@@ -1,25 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import _ from 'lodash'
 
 import {
   Form,
-  Button
+  Button,
+  Badge
 } from 'react-bootstrap'
+import { CheckCircleFill } from 'react-bootstrap-icons';
 
 import Vote from '../utils/Vote.mjs';
 import { MsgVote } from '../messages/MsgVote.mjs';
 import { execableMessage } from '../utils/Helpers.mjs';
 
 function VoteForm(props) {
-  const { proposal, vote, address, wallet, granter, setError } = props
+  const { proposal, vote, wallet, granter, setError } = props
   const { proposal_id } = proposal
 
-  const choices = {
-    'VOTE_OPTION_YES': 'Yes',
-    'VOTE_OPTION_NO': 'No',
-    'VOTE_OPTION_NO_WITH_VETO': 'No with Veto',
-    'VOTE_OPTION_ABSTAIN': 'Abstain'
-  }
+  const choices = [
+    { key: 'VOTE_OPTION_YES', label: 'Yes', dotClass: 'bg-success' },
+    { key: 'VOTE_OPTION_NO', label: 'No', dotClass: 'bg-danger' },
+    { key: 'VOTE_OPTION_NO_WITH_VETO', label: 'No with Veto', dotClass: 'bg-warning' },
+    { key: 'VOTE_OPTION_ABSTAIN', label: 'Abstain', dotClass: 'bg-secondary' }
+  ]
 
   const [choice, setChoice] = useState(vote?.option)
   const [loading, setLoading] = useState()
@@ -27,10 +28,6 @@ function VoteForm(props) {
   useEffect(() => {
     setChoice(vote?.option)
   }, [vote])
-
-  function handleVoteChange(event) {
-    setChoice(event.target.name)
-  }
 
   function handleSubmit(event) {
     event.preventDefault();
@@ -88,55 +85,52 @@ function VoteForm(props) {
   function buttonText() {
     if (!proposal.isVoting) return proposal.isDeposit ? 'Voting not started' : 'Voting ended'
 
-    return vote ? voteChanged ? 'Change vote' : 'Voted' : 'Vote'
+    return vote ? voteChanged ? 'Change vote' : 'Voted' : 'Cast Vote'
   }
 
+  const disabled = !proposal.isVoting || !hasPermission();
 
   return (
-    <>
-      <Form onSubmit={handleSubmit}>
-        <Form.Group className="border-top pt-2 my-2">
-          <div className="row pe-lg-5">
-            {_.chunk(Object.entries(choices), 2).map((group, index) => {
-              return (
-                <div key={index} className="col-6">
-                  {group.map(([key, value]) => {
-                    const voteChoice = vote && key === vote.option
-                    return (
-                      <div key={`vote-${key}`} className="mb-2">
-                        <Form.Check type='radio' id={`vote-${key}`}>
-                          <Form.Check.Input type='radio'
-                            name={key}
-                            checked={key === choice}
-                            disabled={!proposal.isVoting || !hasPermission()}
-                            onChange={handleVoteChange}
-                          />
-                          <Form.Check.Label className="d-block text-nowrap">
-                            {voteChoice ? <strong>{value}</strong> : value}
-                          </Form.Check.Label>
-                        </Form.Check>
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            }).flat()}
-          </div>
-        </Form.Group>
-        <p className="text-end">
-          {!loading
-            ? (
-              <Button type="submit" disabled={!canVote()} className="btn btn-primary">
-                {buttonText()}
-              </Button>
-            ) : (
-              <Button className="btn btn-primary" type="button" disabled>
-                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>&nbsp;
-              </Button>
-            )}
-        </p>
-      </Form>
-    </>
+    <Form onSubmit={handleSubmit}>
+      <div className="row g-2 my-2">
+        {choices.map(({ key, label, dotClass }) => {
+          const isSelected = key === choice;
+          const isCurrentVote = vote && key === vote.option;
+          return (
+            <div key={key} className="col-6">
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => !disabled && setChoice(key)}
+                className={`rs-choice-card ${isSelected ? 'is-selected' : ''} ${disabled ? 'is-disabled' : ''}`}
+              >
+                <span className="d-flex align-items-center gap-2 text-truncate">
+                  <span className={`rs-status-dot ${dotClass}`} />
+                  <span>{label}</span>
+                </span>
+                {isCurrentVote ? (
+                  <Badge bg="success-subtle" className="text-success-emphasis border border-success-subtle small">Voted</Badge>
+                ) : isSelected ? (
+                  <CheckCircleFill size={14} className="text-primary flex-shrink-0" />
+                ) : null}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-end mt-3">
+        {!loading
+          ? (
+            <Button type="submit" disabled={!canVote()} className="btn btn-primary">
+              {buttonText()}
+            </Button>
+          ) : (
+            <Button className="btn btn-primary" type="button" disabled>
+              <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>&nbsp;
+            </Button>
+          )}
+      </div>
+    </Form>
   )
 }
 

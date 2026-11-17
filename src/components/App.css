@@ -218,3 +218,276 @@ button.rs-surface-card:hover,
   outline-offset: 2px;
 }
 
+/* Unified Command Header */
+.rs-command-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  background-color: var(--rs-header-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rs-border-color);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.rs-chain-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.65rem;
+  background-color: var(--rs-surface-bg);
+  border: 1px solid var(--rs-border-color);
+  border-radius: 9999px;
+  color: var(--bs-body-color);
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: var(--rs-shadow-sm);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.rs-chain-trigger:hover {
+  border-color: var(--bs-primary);
+  box-shadow: var(--rs-shadow-hover);
+}
+
+.rs-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.1rem 0.4rem;
+  font-family: var(--bs-font-monospace);
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--bs-secondary-color);
+  background-color: var(--rs-surface-subtle);
+  border: 1px solid var(--rs-border-color);
+  border-radius: 0.35rem;
+}
+
+.rs-nav-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  background-color: var(--rs-surface-subtle);
+  border: 1px solid var(--rs-border-color);
+  border-radius: 0.65rem;
+}
+
+.rs-nav-segmented .nav-link {
+  color: var(--bs-secondary-color);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.45rem;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rs-nav-segmented .nav-link:hover {
+  color: var(--bs-body-color);
+}
+
+.rs-nav-segmented .nav-link.active {
+  color: var(--bs-body-color);
+  background-color: var(--rs-surface-bg);
+  box-shadow: var(--rs-shadow-sm);
+  font-weight: 600;
+}
+
+.rs-wallet-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background-color: var(--rs-surface-bg);
+  border: 1px solid var(--rs-border-color);
+  border-radius: 9999px;
+  color: var(--bs-body-color);
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: var(--rs-shadow-sm);
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.rs-wallet-pill:hover {
+  border-color: var(--bs-primary);
+}
+
+.rs-proxy-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  margin-bottom: 1.25rem;
+  background-color: var(--rs-primary-subtle);
+  border: 1px solid rgba(var(--bs-primary-rgb), 0.25);
+  border-radius: 0.75rem;
+  font-size: 0.85rem;
+}
+
+/* Command-K Network Palette */
+.rs-cmd-list {
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.rs-cmd-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--bs-body-color);
+  text-align: left;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.rs-cmd-item:hover,
+.rs-cmd-item.is-active {
+  background-color: var(--rs-surface-subtle);
+  border-color: var(--rs-border-color);
+}
+
+.rs-cmd-item.is-current {
+  background-color: var(--rs-primary-subtle);
+  border-color: rgba(var(--bs-primary-rgb), 0.3);
+}
+
+/* Explore Network Cards */
+.rs-network-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background-color: var(--rs-surface-bg);
+  border: 1px solid var(--rs-border-color);
+  border-radius: 0.85rem;
+  padding: 1rem;
+  box-shadow: var(--rs-shadow-sm);
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.rs-network-card.rs-network-online:hover {
+  border-color: var(--bs-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--rs-shadow-hover);
+}
+
+.rs-network-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  margin-top: 0.85rem;
+  border-top: 1px solid var(--rs-border-color);
+}
+
+.rs-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+/* Slide-over Validator Inspector Drawer */
+.rs-inspector-drawer.offcanvas {
+  width: min(540px, 100vw) !important;
+  background-color: var(--rs-surface-bg);
+  border-left: 1px solid var(--rs-border-color);
+}
+
+.rs-restake-hero {
+  background-color: var(--rs-surface-subtle);
+  border: 1px solid var(--rs-border-color);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.rs-restake-hero.is-active {
+  background-color: var(--rs-primary-subtle);
+  border-color: rgba(var(--bs-primary-rgb), 0.3);
+}
+
+.rs-chip-btn {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 0.4rem;
+  border: 1px solid var(--rs-border-color);
+  background-color: var(--rs-surface-subtle);
+  color: var(--bs-body-color);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.rs-chip-btn:hover:not(:disabled) {
+  border-color: var(--bs-primary);
+  background-color: var(--rs-primary-subtle);
+}
+
+/* Tactile Choice & Preset Cards (Governance & Grants) */
+.rs-choice-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--rs-border-color);
+  border-radius: 0.65rem;
+  background-color: var(--rs-surface-bg);
+  color: var(--bs-body-color);
+  font-weight: 500;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rs-choice-card:hover:not(.is-disabled) {
+  border-color: var(--bs-primary);
+}
+
+.rs-choice-card.is-selected {
+  border-color: var(--bs-primary);
+  background-color: var(--rs-primary-subtle);
+  box-shadow: 0 0 0 1px var(--bs-primary);
+}
+
+.rs-choice-card.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rs-preset-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--rs-border-color);
+  border-radius: 0.6rem;
+  background-color: var(--rs-surface-bg);
+  color: var(--bs-body-color);
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.rs-preset-card:hover {
+  border-color: var(--bs-primary);
+}
+
+.rs-preset-card.is-selected {
+  border-color: var(--bs-primary);
+  background-color: var(--rs-primary-subtle);
+}
+
+
