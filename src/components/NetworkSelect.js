@@ -11,7 +11,7 @@ import Select from 'react-select';
 import NetworkChecks from './NetworkChecks.js';
 import NetworkImage from './NetworkImage.js';
 import Favourite from './Favourite.js';
-import { BookmarkStar, BookmarkStarFill } from 'react-bootstrap-icons';
+import { BookmarkStar, BookmarkStarFill, ChevronDown } from 'react-bootstrap-icons';
 
 function NetworkSelect(props) {
   const [show, setShow] = useState(props.show);
@@ -118,33 +118,29 @@ function NetworkSelect(props) {
 
   return (
     <>
-      <Button onClick={handleOpen} variant="link" className="d-flex flex-nowrap text-nowrap align-items-center text-reset text-decoration-none border-secondary btn-outline-light" role="button">
+      <Button id="network-select-trigger" onClick={handleOpen} variant="outline-secondary" className="d-flex flex-nowrap text-nowrap align-items-center gap-2 text-reset">
         {props.network ? (
           <>
-            <NetworkImage network={props.network} width={30} height={30} alt={props.network.prettyName} className="text-white" />
-            <div className="d-none d-md-block mx-2">
-              <span className="h6">{props.network.prettyName}</span>
+            <NetworkImage network={props.network} width={28} height={28} alt={props.network.prettyName} className="text-white" />
+            <div className="d-none d-md-flex align-items-baseline gap-2">
+              <span className="h6 mb-0">{props.network.prettyName}</span>
               {!!price?.usd && (
-                <em className="text-muted small">&nbsp; ${price.usd.toLocaleString(undefined, { maximumFractionDigits: 4, minimumFractionDigits: 2 })}</em>
+                <em className="text-muted small">${price.usd.toLocaleString(undefined, { maximumFractionDigits: 4, minimumFractionDigits: 2 })}</em>
               )}
             </div>
-            <div className="d-none d-md-block ms-2">
+            <div className="d-none d-md-block">
               {props.network.authzSupport
-                ? <Badge className="rounded-pill" bg="success">Authz</Badge>
-                : <Badge className="rounded-pill text-decoration-line-through" bg="danger">Authz</Badge>
+                ? <Badge bg={null} className="rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">Authz</Badge>
+                : <Badge bg={null} className="rounded-pill bg-secondary-subtle text-secondary-emphasis border">No Authz</Badge>
               }
             </div>
           </>
         ) : (
-          <>
-            <div className="d-none d-md-block ms-2">
-              <span className="h6">Choose a Network</span>
-            </div>
-          </>
+          <div className="d-none d-md-block">
+            <span className="h6 mb-0">Choose a Network</span>
+          </div>
         )}
-        <div className="ms-2">
-          <i className="bi bi-chevron-down text-muted text-xs"></i>
-        </div>
+        <ChevronDown className="text-muted ms-1" size={14} />
       </Button>
       <Modal show={show} onHide={handleClose}>
         <Modal.Header closeButton>
@@ -164,33 +160,95 @@ function NetworkSelect(props) {
                         options={options.grouped || options.networks}
                         onChange={selectNetwork}
                         formatOptionLabel={network => (
-                          <div className={'d-flex' + (!network.online ? ' text-muted' : '')}>
+                          <div className={'d-flex align-items-center' + (!network.online ? ' text-muted' : '')}>
                             <div className="pe-2">
                               <NetworkImage network={network} width={30} height={30} alt={network.label} />
                             </div>
-                            <div className="pt-1 me-auto">
+                            <div className="me-auto">
                               <span className="ms-1">{network.label} {!network.online && <small>(Offline)</small>}</span>
                             </div>
-                            <div className="text-end pt-1 d-none d-sm-block">
+                            <div className="text-end d-none d-sm-block">
                               {network.restakeSupport && network.operatorCount > 0 &&
                                 <small>{network.operatorCount} Operator{network.operatorCount > 1 ? 's' : ''}</small>
                               }
                             </div>
-                            <div className="text-end pt-1">
+                            <div className="text-end">
                               {network.authz
-                                ? <Badge className={`ms-3 rounded-pill` + (!network.online ? ' opacity-50' : '')} bg="success">Authz</Badge>
-                                : <Badge className={`ms-3 rounded-pill text-decoration-line-through` + (!network.online ? ' opacity-50' : '')} bg="danger">Authz</Badge>
+                                ? <Badge bg={null} className={`ms-3 rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle` + (!network.online ? ' opacity-50' : '')}>Authz</Badge>
+                                : <Badge bg={null} className={`ms-3 rounded-pill bg-secondary-subtle text-secondary-emphasis border` + (!network.online ? ' opacity-50' : '')}>No Authz</Badge>
                               }
                             </div>
                           </div>
                         )}
+                        styles={{
+                          control: (base, state) => ({
+                            ...base,
+                            backgroundColor: 'var(--bs-body-bg)',
+                            borderColor: state.isFocused ? 'var(--bs-primary)' : 'var(--bs-border-color)',
+                            color: 'var(--bs-body-color)',
+                            boxShadow: state.isFocused ? '0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25)' : 'none',
+                            '&:hover': {
+                              borderColor: state.isFocused ? 'var(--bs-primary)' : 'var(--bs-border-color)',
+                            },
+                          }),
+                          menu: (base) => ({
+                            ...base,
+                            backgroundColor: 'var(--bs-body-bg)',
+                            border: '1px solid var(--bs-border-color)',
+                            color: 'var(--bs-body-color)',
+                            zIndex: 1060,
+                          }),
+                          menuList: (base) => ({
+                            ...base,
+                            backgroundColor: 'var(--bs-body-bg)',
+                          }),
+                          option: (base, state) => ({
+                            ...base,
+                            backgroundColor: state.isSelected || state.isFocused
+                              ? 'var(--bs-tertiary-bg)'
+                              : 'var(--bs-body-bg)',
+                            color: 'var(--bs-body-color)',
+                            cursor: 'pointer',
+                            ':active': {
+                              backgroundColor: 'var(--bs-tertiary-bg)',
+                            },
+                          }),
+                          input: (base) => ({
+                            ...base,
+                            color: 'var(--bs-body-color)',
+                          }),
+                          singleValue: (base) => ({
+                            ...base,
+                            color: 'var(--bs-body-color)',
+                          }),
+                          placeholder: (base) => ({
+                            ...base,
+                            color: 'var(--bs-secondary-color)',
+                          }),
+                          groupHeading: (base) => ({
+                            ...base,
+                            color: 'var(--bs-secondary-color)',
+                          }),
+                        }}
                         theme={(theme) => ({
                           ...theme,
                           colors: {
                             ...theme.colors,
                             neutral0: 'var(--bs-body-bg)',
-                            neutral80: 'var(--bs-body)',
-                            primary25: 'var(--bs-light)'
+                            neutral5: 'var(--bs-tertiary-bg)',
+                            neutral10: 'var(--bs-tertiary-bg)',
+                            neutral20: 'var(--bs-border-color)',
+                            neutral30: 'var(--bs-border-color)',
+                            neutral40: 'var(--bs-secondary-color)',
+                            neutral50: 'var(--bs-secondary-color)',
+                            neutral60: 'var(--bs-body-color)',
+                            neutral70: 'var(--bs-body-color)',
+                            neutral80: 'var(--bs-body-color)',
+                            neutral90: 'var(--bs-body-color)',
+                            primary: 'var(--bs-primary)',
+                            primary25: 'var(--bs-tertiary-bg)',
+                            primary50: 'var(--bs-secondary-bg)',
+                            primary75: 'var(--bs-primary)',
                           },
                         })}
                       />

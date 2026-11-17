@@ -6,9 +6,10 @@ import {
   Row,
   Col,
   Card,
-  Nav
+  Nav,
+  Button
 } from 'react-bootstrap'
-import { XCircle, BookmarkStar, BookmarkStarFill } from "react-bootstrap-icons";
+import { Search, XCircle, BookmarkStar, BookmarkStarFill } from "react-bootstrap-icons";
 import NetworkChecks from './NetworkChecks';
 import NetworkImage from './NetworkImage';
 import Favourite from './Favourite';
@@ -68,11 +69,44 @@ function Networks(props) {
   }
 
   function renderNetworks(networks){
+    if (networks.length === 0) {
+      return (
+        <div className="rs-surface-card text-center py-5 px-3 my-2">
+          <p className="h6 fw-semibold mb-2">No networks match your search</p>
+          <p className="text-body-secondary small mb-3">
+            {filter.keywords
+              ? `No networks found matching "${filter.keywords}".`
+              : 'No networks are available in this category.'}
+          </p>
+          <div className="d-flex flex-wrap justify-content-center gap-2">
+            {filter.keywords && (
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={() => setFilter({ ...filter, keywords: '' })}
+              >
+                Clear search
+              </Button>
+            )}
+            {filter.group !== 'all' && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setFilter({ keywords: '', group: 'all' })}
+              >
+                Show all networks
+              </Button>
+            )}
+          </div>
+        </div>
+      )
+    }
+
     return (
       <Row xs={1} sm={2} lg={3} xxl={4} className="g-4 justify-content-center">
         {networks.map((network) => (
           <Col key={network.path} className={network.online ? '' : 'opacity-50'}>
-            <Card>
+            <Card className="rs-surface-card h-100 p-2 position-relative">
               <Favourite
                 value={favourites.includes(network.path)}
                 toggle={() => props.toggleFavourite(network)}
@@ -83,14 +117,26 @@ function Networks(props) {
                 className="text-success text-right position-absolute top-0 end-0 p-2"
                 style={{ zIndex: 2 }}
               />
-              <span role={ network.online ? "button" : "" } className="stretched-link" onClick={() => changeNetwork(network)}>
-                <Row className="g-0">
+              <span
+                role={network.online ? 'button' : undefined}
+                tabIndex={network.online ? 0 : undefined}
+                aria-label={network.online ? `Select ${network.prettyName}` : `${network.prettyName} (Offline)`}
+                className="stretched-link text-decoration-none text-reset"
+                onClick={() => changeNetwork(network)}
+                onKeyDown={(e) => {
+                  if (network.online && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault()
+                    changeNetwork(network)
+                  }
+                }}
+              >
+                <Row className="g-0 align-items-center h-100">
                   <Col xs={3} className="text-center">
-                    <NetworkImage network={network} width={60} height={60} className="m-2 shadow overflow-hidden rounded-circle" />
+                    <NetworkImage network={network} width={56} height={56} className="m-1 shadow-sm overflow-hidden rounded-circle" />
                   </Col>
                   <Col xs={9}>
-                    <Card.Body>
-                      <Card.Title className="text-truncate">{network.prettyName}</Card.Title>
+                    <Card.Body className="py-2 px-2">
+                      <Card.Title className="text-truncate pe-4 mb-1 fs-6 fw-semibold">{network.prettyName}</Card.Title>
                       <NetworkChecks network={network} className="small" skipConnected={true} style={{position: 'relative', zIndex: 2}} />
                     </Card.Body>
                   </Col>
@@ -105,39 +151,46 @@ function Networks(props) {
 
   return (
     <>
-      <div className="d-flex flex-nowrap justify-content-center align-items-start mb-3 position-relative">
-        <div className="flex-fill flex-md-grow-0 me-2 me-md-5 mb-2 mb-md-0">
-          <div className="input-group">
-            <input className="form-control border-right-0 border" onChange={filterNetworks} value={filter.keywords} type="text" placeholder="Search.." />
-            <span className="input-group-append">
-              <button className="btn btn-light text-dark border-left-0 border" type="button" onClick={() => setFilter({...filter, keywords: ''})}>
-                <XCircle />
-              </button>
-            </span>
-          </div>
+      <div className="rs-toolbar d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div className="input-group flex-grow-1" style={{ maxWidth: 360, minWidth: 220 }}>
+          <span className="input-group-text bg-transparent border-end-0 text-body-secondary">
+            <Search size={14} aria-hidden="true" />
+          </span>
+          <input
+            id="network-search-input"
+            className="form-control border-start-0 border-end-0"
+            onChange={filterNetworks}
+            value={filter.keywords}
+            type="text"
+            placeholder="Search networks..."
+            aria-label="Search networks"
+          />
+          <button
+            className="btn border border-start-0 text-body-secondary"
+            type="button"
+            onClick={() => setFilter({...filter, keywords: ''})}
+            aria-label="Clear search"
+            disabled={!filter.keywords}
+          >
+            <XCircle size={14} />
+          </button>
         </div>
-        <div className="d-lg-flex d-none position-absolute mx-auto justify-content-center align-self-center">
-          <Nav fill variant="pills" activeKey={filter.group} className={`flex-row${props.modal ? ' small' : ''}`} onSelect={(e) => setFilter({...filter, group: e})}>
-            <Nav.Item>
-              <Nav.Link eventKey="favourites" disabled={filteredNetworks(networks, {...filter, group: 'favourites'}).length < 1}>Favourites</Nav.Link>
-            </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="featured" disabled={filteredNetworks(networks, {...filter, group: 'featured'}).length < 1}>Featured</Nav.Link>
-            </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="all">All Networks</Nav.Link>
-            </Nav.Item>
-          </Nav>
-        </div>
-        <div className="d-flex d-lg-none justify-content-end">
-          <select className="form-select w-auto h-auto d-lg-none" aria-label="Network group" value={filter.group} onChange={(e) => setFilter({...filter, group: e.target.value})}>
-            <option value="favourites" disabled={filteredNetworks(networks, {...filter, group: 'favourites'}).length < 1}>Favourites</option>
-            <option value="featured" disabled={filteredNetworks(networks, {...filter, group: 'featured'}).length < 1}>Featured</option>
-            <option value="all">All</option>
-          </select>
-        </div>
-        <div className="flex-fill d-none d-lg-flex justify-content-end">
-        </div>
+        <Nav
+          variant="pills"
+          activeKey={filter.group}
+          className={`flex-wrap gap-1${props.modal ? ' small' : ''}`}
+          onSelect={(e) => setFilter({...filter, group: e})}
+        >
+          <Nav.Item>
+            <Nav.Link eventKey="favourites" disabled={filteredNetworks(networks, {...filter, group: 'favourites'}).length < 1}>Favourites</Nav.Link>
+          </Nav.Item>
+          <Nav.Item>
+            <Nav.Link eventKey="featured" disabled={filteredNetworks(networks, {...filter, group: 'featured'}).length < 1}>Featured</Nav.Link>
+          </Nav.Item>
+          <Nav.Item>
+            <Nav.Link eventKey="all">All Networks</Nav.Link>
+          </Nav.Item>
+        </Nav>
       </div>
       {renderNetworks(results)}
     </>

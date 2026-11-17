@@ -23,7 +23,7 @@ import ValidatorName from "./ValidatorName";
 import ValidatorServices from './ValidatorServices';
 import REStakeStatus from './REStakeStatus';
 import AlertMessage from './AlertMessage';
-import { omit, sumCoins } from '../utils/Helpers.mjs';
+import { joinString, omit, sumCoins } from '../utils/Helpers.mjs';
 
 function sortValidatorsList(validators, { network, delegations, operators }) {
   const sortedByDelegation = _.sortBy(validators, ({ operator_address: address }) => {
@@ -223,7 +223,7 @@ function Validators(props) {
         </td>
         {network.apyEnabled && (
           <td
-            className={filter.group === 'delegated' ? 'd-none d-lg-table-cell text-centre' : 'text-center'}
+            className={joinString(filter.group === 'delegated' ? 'd-none d-lg-table-cell' : '', 'text-center tabular-nums')}
             role="button"
             onClick={() => props.showValidator(validator, { activeTab: 'profile' })}
           >
@@ -234,7 +234,7 @@ function Validators(props) {
           </td>
         )}
         <td
-          className={network.apyEnabled ? 'text-center d-none d-lg-table-cell' : filter.group === 'delegated' ? 'd-none d-lg-table-cell text-centre' : 'text-center'}
+          className={joinString(network.apyEnabled || filter.group === 'delegated' ? 'd-none d-lg-table-cell' : '', 'text-center tabular-nums')}
           role="button"
           onClick={() => props.showValidator(validator, { activeTab: 'profile' })}
         >
@@ -242,7 +242,7 @@ function Validators(props) {
         </td>
         {props.isLoading('delegations') || Object.keys(delegations || {}).length ? (
           <td
-            className={filter.group === 'delegated' ? '' : 'd-none d-sm-table-cell'}
+            className={joinString(filter.group === 'delegated' ? '' : 'd-none d-sm-table-cell', 'tabular-nums')}
             role="button"
             onClick={() => props.showValidator(validator, { activeTab: 'stake' })}
           >
@@ -265,7 +265,7 @@ function Validators(props) {
         ) : null}
         {!props.modal && filter.group === 'delegated' && (
           <td
-            className="d-none d-md-table-cell"
+            className="d-none d-md-table-cell tabular-nums"
             role="button"
             onClick={() => props.showValidator(validator, { activeTab: 'stake' })}
           >
@@ -282,7 +282,7 @@ function Validators(props) {
         )}
         {!props.modal && filter.group === 'delegated' && showCommission && (
           <td
-            className="d-none d-lg-table-cell"
+            className="d-none d-lg-table-cell tabular-nums"
             role="button"
             onClick={() => props.showValidator(validator, { activeTab: 'stake' })}
           >
@@ -326,148 +326,163 @@ function Validators(props) {
           </div>
         </AlertMessage>
       )}
-      <div className="d-flex flex-wrap justify-content-between align-items-start mb-3 position-relative">
-        <div className="d-none d-sm-flex">
-          <div className="input-group">
-            <input className="form-control border-right-0 border" onChange={filterValidators} value={filter.keywords} type="text" placeholder="Search.." style={{maxWidth: 150}} />
-            <span className="input-group-append">
-              <button className="btn btn-light text-dark border-left-0 border" type="button" onClick={() => setFilter({keywords: ''})}>
-                <XCircle />
-              </button>
-            </span>
-          </div>
+      <div className="rs-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div className="input-group w-auto flex-grow-1 flex-sm-grow-0" style={{ minWidth: '180px', maxWidth: '240px' }}>
+          <input
+            id="validator-search-input"
+            className="form-control border-end-0"
+            onChange={filterValidators}
+            value={filter.keywords}
+            type="text"
+            placeholder="Search validators..."
+            aria-label="Search validators"
+          />
+          <button
+            className="btn btn-outline-secondary border-start-0"
+            type="button"
+            aria-label="Clear search"
+            onClick={() => setFilter({ keywords: '' })}
+          >
+            <XCircle />
+          </button>
         </div>
-        <div className="w-100 d-flex d-sm-none mb-2">
-          <div className="input-group">
-            <input className="form-control border-right-0 border" onChange={filterValidators} value={filter.keywords} type="text" placeholder="Search.." />
-            <span className="input-group-append">
-              <button className="btn btn-light text-dark border-left-0 border" type="button" onClick={() => setFilter({keywords: ''})}>
-                <XCircle />
-              </button>
-            </span>
-          </div>
-        </div>
-        <div className={`${!props.modal && 'd-md-flex'} d-none justify-content-center align-self-center`}>
-          <Nav fill variant="pills" activeKey={filter.group} className={`flex-row${props.modal ? ' small' : ''}`} onSelect={(e) => setFilter({group: e})}>
-            <Nav.Item>
-              <Nav.Link eventKey="delegated" disabled={filteredValidators(validators, {...filter, group: 'delegated'}).length < 1}>My Delegations</Nav.Link>
-            </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="all">All Validators</Nav.Link>
-            </Nav.Item>
-          </Nav>
-        </div>
-        <div className={`d-flex ${!props.modal && 'd-md-none'} justify-content-center`}>
-          <select className="form-select w-auto h-auto" aria-label="Delegation group" value={filter.group} onChange={(e) => setFilter({group: e.target.value})}>
-            <option value="delegated" disabled={filteredValidators(validators, {...filter, group: 'delegated'}).length < 1}>My Delegations</option>
-            <option value="all">All Validators</option>
-          </select>
-        </div>
+        <Nav
+          id="validator-group-filter"
+          fill
+          variant="pills"
+          activeKey={filter.group}
+          className={`flex-row${props.modal ? ' small' : ''}`}
+          onSelect={(e) => setFilter({ group: e })}
+        >
+          <Nav.Item>
+            <Nav.Link eventKey="delegated" disabled={filteredValidators(validators, { ...filter, group: 'delegated' }).length < 1}>My Delegations</Nav.Link>
+          </Nav.Item>
+          <Nav.Item>
+            <Nav.Link eventKey="all">All Validators</Nav.Link>
+          </Nav.Item>
+        </Nav>
         <div className="d-flex justify-content-end">
-          <select className="form-select w-auto h-auto" aria-label="Validator status" value={filter.status} onChange={(e) => setFilter({status: e.target.value})}>
+          <select
+            id="validator-status-filter"
+            className="form-select w-auto h-auto"
+            aria-label="Validator status"
+            value={filter.status}
+            onChange={(e) => setFilter({ status: e.target.value })}
+          >
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="all">All</option>
           </select>
         </div>
       </div>
-      {results.length > 0 &&
-        <Table className="align-middle table-striped">
-          <thead>
-            <tr>
-              <th colSpan={2}>Validator</th>
-              <th className="text-center">REStake</th>
-              {network.apyEnabled && (
-                <th className={filter.group === 'delegated' ? 'd-none d-lg-table-cell text-centre' : 'text-center'}>
-                  <TooltipIcon
-                    icon={<span className="text-decoration-underline">APY</span>}
-                    identifier="delegations-apy"
-                  >
-                    <div className="mt-2 text-center">
-                      <p>Based on commission, compounding frequency and recent block times.</p>
-                      <p>This is a best case scenario and may not be 100% accurate.</p>
-                    </div>
-                  </TooltipIcon>
-                </th>
-              )}
-              <th className={network.apyEnabled ? 'text-center d-none d-lg-table-cell' : filter.group === 'delegated' ? 'd-none d-lg-table-cell text-centre' : 'text-center'}>Fee</th>
-              {props.isLoading('delegations') || Object.keys(delegations || {}).length ? (
-                <th className={filter.group === 'delegated' ? '' : 'd-none d-sm-table-cell'}>Delegation</th>
-              ) : null}
-              {!props.modal && filter.group === 'delegated' && (
-                <th className="d-none d-md-table-cell">Rewards</th>
-              )}
-              {!props.modal && filter.group === 'delegated' && showCommission && (
-                <th className="d-none d-lg-table-cell">Commission</th>
-              )}
-              {!props.modal && (
-                <th className={filter.group === 'delegated' ? 'd-none d-sm-table-cell' : ''}></th>
-              )}
-              <th className="d-none d-sm-table-cell text-center"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map(item => renderValidator(item))}
-          </tbody>
-          {results.length > 1 && (
-            <tfoot>
+      {results.length > 0 && (
+        <div className="rs-table-wrapper">
+          <Table hover className="align-middle mb-0">
+            <thead>
               <tr>
-                <td colSpan={2}></td>
-                <td className="text-center"></td>
+                <th colSpan={2}>Validator</th>
+                <th className="text-center">REStake</th>
                 {network.apyEnabled && (
-                  <td className={filter.group === 'delegated' ? 'd-none d-lg-table-cell text-centre' : 'text-center'}></td>
+                  <th className={filter.group === 'delegated' ? 'd-none d-lg-table-cell text-center' : 'text-center'}>
+                    <TooltipIcon
+                      icon={<span className="text-decoration-underline">APY</span>}
+                      identifier="delegations-apy"
+                    >
+                      <div className="mt-2 text-center">
+                        <p>Based on commission, compounding frequency and recent block times.</p>
+                        <p>This is a best case scenario and may not be 100% accurate.</p>
+                      </div>
+                    </TooltipIcon>
+                  </th>
                 )}
-                <td className={network.apyEnabled ? 'text-center d-none d-lg-table-cell' : filter.group === 'delegated' ? 'd-none d-lg-table-cell text-centre' : 'text-center'}></td>
+                <th className={network.apyEnabled || filter.group === 'delegated' ? 'text-center d-none d-lg-table-cell' : 'text-center'}>Fee</th>
                 {props.isLoading('delegations') || Object.keys(delegations || {}).length ? (
-                  <td className={filter.group === 'delegated' ? '' : 'd-none d-sm-table-cell'}>
-                    <strong className="small">
-                      <Coin
-                        amount={totalDelegation()}
-                        denom={network.denom}
-                        asset={network.baseAsset}
-                        precision={3}
-                      />
-                    </strong>
-                  </td>
+                  <th className={filter.group === 'delegated' ? '' : 'd-none d-sm-table-cell'}>Delegation</th>
                 ) : null}
                 {!props.modal && filter.group === 'delegated' && (
-                  <td className="d-none d-md-table-cell">
-                    {props.rewards && (
-                      <strong className="small">
-                        <Coins
-                          coins={totalRewards()}
-                          network={network}
-                          precision={3}
-                        />
-                      </strong>
-                    )}
-                  </td>
+                  <th className="d-none d-md-table-cell">Rewards</th>
                 )}
                 {!props.modal && filter.group === 'delegated' && showCommission && (
-                  <td className="d-none d-lg-table-cell">
-                    {props.commission && (
+                  <th className="d-none d-lg-table-cell">Commission</th>
+                )}
+                {!props.modal && (
+                  <th className={filter.group === 'delegated' ? 'd-none d-sm-table-cell' : ''}></th>
+                )}
+                <th className="d-none d-sm-table-cell text-center"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map(item => renderValidator(item))}
+            </tbody>
+            {results.length > 1 && (
+              <tfoot>
+                <tr>
+                  <td colSpan={2}></td>
+                  <td className="text-center"></td>
+                  {network.apyEnabled && (
+                    <td className={filter.group === 'delegated' ? 'd-none d-lg-table-cell text-center' : 'text-center'}></td>
+                  )}
+                  <td className={network.apyEnabled || filter.group === 'delegated' ? 'text-center d-none d-lg-table-cell' : 'text-center'}></td>
+                  {props.isLoading('delegations') || Object.keys(delegations || {}).length ? (
+                    <td className={joinString(filter.group === 'delegated' ? '' : 'd-none d-sm-table-cell', 'tabular-nums')}>
                       <strong className="small">
-                        <Coins
-                          coins={totalCommission()}
-                          network={network}
+                        <Coin
+                          amount={totalDelegation()}
+                          denom={network.denom}
+                          asset={network.baseAsset}
                           precision={3}
                         />
                       </strong>
-                    )}
-                  </td>
-                )}
-                {!props.modal && (
-                  <td className={filter.group === 'delegated' ? 'd-none d-sm-table-cell' : ''}></td>
-                )}
-                <td className="d-none d-sm-table-cell"></td>
-              </tr>
-            </tfoot>
-          )}
-        </Table>
-      }
-      {results.length < 1 &&
-        <p className="text-center my-5"><em>No validators found</em></p>
-      }
+                    </td>
+                  ) : null}
+                  {!props.modal && filter.group === 'delegated' && (
+                    <td className="d-none d-md-table-cell tabular-nums">
+                      {props.rewards && (
+                        <strong className="small">
+                          <Coins
+                            coins={totalRewards()}
+                            network={network}
+                            precision={3}
+                          />
+                        </strong>
+                      )}
+                    </td>
+                  )}
+                  {!props.modal && filter.group === 'delegated' && showCommission && (
+                    <td className="d-none d-lg-table-cell tabular-nums">
+                      {props.commission && (
+                        <strong className="small">
+                          <Coins
+                            coins={totalCommission()}
+                            network={network}
+                            precision={3}
+                          />
+                        </strong>
+                      )}
+                    </td>
+                  )}
+                  {!props.modal && (
+                    <td className={filter.group === 'delegated' ? 'd-none d-sm-table-cell' : ''}></td>
+                  )}
+                  <td className="d-none d-sm-table-cell"></td>
+                </tr>
+              </tfoot>
+            )}
+          </Table>
+        </div>
+      )}
+      {results.length < 1 && (
+        <div className="text-center my-5">
+          <p className="text-body-secondary mb-3"><em>No validators match your current filters.</em></p>
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={() => setFilter({ keywords: '', status: 'all', group: 'all' })}
+          >
+            Reset filters
+          </Button>
+        </div>
+      )}
     </>
   )
 }

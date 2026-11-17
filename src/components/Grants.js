@@ -7,7 +7,8 @@ import {
   Spinner,
   Table,
   Nav,
-  Button
+  Button,
+  Badge
 } from 'react-bootstrap'
 import { XCircle } from "react-bootstrap-icons";
 
@@ -18,6 +19,20 @@ import GrantModal from './GrantModal';
 import Favourite from './Favourite';
 import Address from './Address'
 import { authzSupportMessage } from '../utils/Helpers.mjs';
+
+function formatAuthorizationType(type) {
+  const raw = (type || '').split('.').slice(-1)[0];
+  switch (raw) {
+    case 'StakeAuthorization':
+      return 'Stake Authorization';
+    case 'GenericAuthorization':
+      return 'Generic Authorization';
+    case 'SendAuthorization':
+      return 'Send Authorization';
+    default:
+      return raw.replace(/([a-z])([A-Z])/g, '$1 $2') || 'Authorization';
+  }
+}
 
 function Grants(props) {
   const { address, wallet, network, operators, validators, grants } = props
@@ -157,15 +172,27 @@ function Grants(props) {
           )}
         </td>
         <td>
-          {authorization['@type'].split('.').slice(-1)[0]}
+          <Badge bg="secondary-subtle" className="text-body border fw-medium">
+            {formatAuthorizationType(authorization['@type'])}
+          </Badge>
         </td>
         <td className="d-none d-lg-table-cell">
           {renderGrantData(grant)}
         </td>
-        <td className={`d-none d-md-table-cell ${expired && 'text-danger'}`}>
-          <Moment format="LLL">
-            {expiration}
-          </Moment>
+        <td className="d-none d-md-table-cell">
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            <span className={expired ? 'text-danger' : ''}>
+              <Moment format="LLL">
+                {expiration}
+              </Moment>
+            </span>
+            <Badge
+              bg={expired ? 'danger-subtle' : 'success-subtle'}
+              className={expired ? 'text-danger-emphasis border border-danger-subtle fw-medium' : 'text-success-emphasis border border-success-subtle fw-medium'}
+            >
+              {expired ? 'Expired' : 'Active'}
+            </Badge>
+          </div>
         </td>
         {filter.group === 'granter' && (
           <td>
@@ -232,67 +259,71 @@ function Grants(props) {
     <>
       {alerts}
       <div className="mb-2">
-        <div className="d-flex flex-wrap justify-content-center align-items-start mb-3 position-relative">
-          <div className="d-none d-md-flex me-5">
-            <div className="input-group">
-              <input className="form-control border-right-0 border" onChange={filterGrants} value={filter.keywords} type="text" placeholder="Search.." />
-              <span className="input-group-append">
-                <button className="btn btn-light text-dark border-left-0 border" type="button" onClick={() => setFilter({ ...filter, keywords: '' })}>
-                  <XCircle />
-                </button>
-              </span>
-            </div>
+        <div className="rs-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+          <div className="input-group w-auto flex-grow-1 flex-sm-grow-0" style={{ minWidth: '180px', maxWidth: '240px' }}>
+            <input
+              id="grant-search-input"
+              className="form-control border-end-0"
+              onChange={filterGrants}
+              value={filter.keywords}
+              type="text"
+              placeholder="Search grants..."
+              aria-label="Search grants"
+            />
+            <button
+              className="btn btn-outline-secondary border-start-0"
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setFilter({ ...filter, keywords: '' })}
+            >
+              <XCircle />
+            </button>
           </div>
-          <div className="w-100 d-flex d-md-none mb-2">
-            <div className="input-group">
-              <input className="form-control border-right-0 border" onChange={filterGrants} value={filter.keywords} type="text" placeholder="Search.." />
-              <span className="input-group-append">
-                <button className="btn btn-light text-dark border-left-0 border" type="button" onClick={() => setFilter({ ...filter, keywords: '' })}>
-                  <XCircle />
-                </button>
-              </span>
-            </div>
-          </div>
-          <div className="d-lg-flex d-none position-absolute mx-auto justify-content-center align-self-center">
-            <Nav fill variant="pills" activeKey={filter.group} className={`${props.modal ? ' small' : ''}`} onSelect={(e) => setFilter({ ...filter, group: e })}>
-              <Nav.Item>
-                <Nav.Link eventKey="granter" disabled={filteredGrants(grants, { ...filter, group: 'granter' }).length < 1}>Granted by me</Nav.Link>
-              </Nav.Item>
-              <Nav.Item>
-                <Nav.Link eventKey="grantee" disabled={filteredGrants(grants, { ...filter, group: 'grantee' }).length < 1}>Granted to me</Nav.Link>
-              </Nav.Item>
-            </Nav>
-          </div>
-          <div className="d-flex d-lg-none justify-content-center">
-            <select className="form-select w-auto h-auto" aria-label="Grant group" value={filter.group} onChange={(e) => setFilter({ ...filter, group: e.target.value })}>
-              <option value="granter" disabled={filteredGrants(grants, { ...filter, group: 'granter' }).length < 1}>Granted by me</option>
-              <option value="grantee" disabled={filteredGrants(grants, { ...filter, group: 'grantee' }).length < 1}>Granted to me</option>
-            </select>
-          </div>
-          <div className="flex-fill d-flex justify-content-end">
-            <Button variant="primary" disabled={!wallet?.hasPermission(address, 'Grant')} onClick={() => setShowModal(true)}>
+          <Nav
+            fill
+            variant="pills"
+            activeKey={filter.group}
+            className={`flex-row${props.modal ? ' small' : ''}`}
+            onSelect={(e) => setFilter({ ...filter, group: e })}
+          >
+            <Nav.Item>
+              <Nav.Link eventKey="granter" disabled={filteredGrants(grants, { ...filter, group: 'granter' }).length < 1}>Granted by me</Nav.Link>
+            </Nav.Item>
+            <Nav.Item>
+              <Nav.Link eventKey="grantee" disabled={filteredGrants(grants, { ...filter, group: 'grantee' }).length < 1}>Granted to me</Nav.Link>
+            </Nav.Item>
+          </Nav>
+          <div className="d-flex justify-content-end ms-auto ms-lg-0">
+            <Button
+              id="grant-new-btn"
+              variant="primary"
+              disabled={!wallet?.hasPermission(address, 'Grant')}
+              onClick={() => setShowModal(true)}
+            >
               {address && !!walletAuthzSupport ? 'New Grant' : 'CLI/Ledger Instructions'}
             </Button>
           </div>
         </div>
-        {results.length > 0 &&
-          <Table className="align-middle table-striped">
-            <thead>
-              <tr>
-                <th>{filter.group === 'grantee' ? 'Granter' : 'Grantee'}</th>
-                <th>Type</th>
-                <th className="d-none d-lg-table-cell">Data</th>
-                <th className="d-none d-md-table-cell">Expiration</th>
-                {filter.group === 'granter' && (
-                  <th></th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {results.map(item => renderGrant(item))}
-            </tbody>
-          </Table>
-        }
+        {results.length > 0 && (
+          <div className="rs-table-wrapper">
+            <Table hover className="align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>{filter.group === 'grantee' ? 'Granter' : 'Grantee'}</th>
+                  <th>Type</th>
+                  <th className="d-none d-lg-table-cell">Data</th>
+                  <th className="d-none d-md-table-cell">Expiration</th>
+                  {filter.group === 'granter' && (
+                    <th></th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {results.map(item => renderGrant(item))}
+              </tbody>
+            </Table>
+          </div>
+        )}
         {results.length < 1 &&
           <p className="text-center my-5"><em>No grants found</em></p>
         }

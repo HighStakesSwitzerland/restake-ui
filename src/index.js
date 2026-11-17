@@ -12,6 +12,7 @@ import {
 import NetworkFinder from './components/NetworkFinder'
 import reportWebVitals from './utils/reportWebVitals';
 
+import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';
 
 const app = (
