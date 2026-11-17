@@ -94,15 +94,6 @@ const Operator = (network, data) => {
     }
   }
 
-  // function nextRun() {
-  //   const today = runTimes()
-  //   const tomorrow = runTimes(moment().startOf('day').add(1, 'day'))
-  //   return [
-  //     ...today,
-  //     ...tomorrow
-  //   ].find(el => el.isAfter())
-  // }
-
   return {
     address,
     botAddress,
@@ -111,7 +102,6 @@ const Operator = (network, data) => {
     moniker: data.description?.moniker,
     description: data.description,
     data,
-    // nextRun,
     frequency,
     runTimes,
     runTimesString,

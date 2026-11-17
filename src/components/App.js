@@ -220,9 +220,7 @@ class App extends React.Component {
     this.setState({
       address,
       wallet,
-      error: false,
-      qrCodeUri: null,
-      qrCodeCallback: null
+      error: false
     })
   }
 
@@ -456,10 +454,13 @@ class App extends React.Component {
   }
 
   showWalletModal(opts) {
-    opts = opts || {}
-    this.setState((state) => {
-      return { walletModal: { ...state.validatorModal, show: true, ...opts } }
-    })
+    this.setState((state) => ({
+      walletModal: {
+        ...state.walletModal,
+        ...opts,
+        show: true
+      }
+    }))
   }
 
   hideWalletModal(opts) {

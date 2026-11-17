@@ -10,12 +10,89 @@ import {
   Button,
   Dropdown,
   Spinner,
-  Dropdown,
- } from "react-bootstrap";
+} from "react-bootstrap";
 import { Gear } from "react-bootstrap-icons";
 
 import { authzSupportMessage, parseGrants, rewardAmount } from "../utils/Helpers.mjs";
 import Validators from "./Validators";
+
+function filterDelegationsByValidators(delegations, validators) {
+  const orderedAddresses = Object.keys(validators);
+  return orderedAddresses.reduce((sum, address) => {
+    if (delegations[address] && delegations[address].balance.amount !== '0') {
+      sum[address] = delegations[address];
+    }
+    return sum;
+  }, {});
+}
+
+function reduceRewardsByValidator(rewards) {
+  return rewards.reduce((sum, reward) => {
+    const validatorRewards = reward.reward.filter(el => largerEq(el.amount, 1));
+    if (validatorRewards.length > 0) {
+      sum[reward.validator_address] = {
+        validator_address: reward.validator_address,
+        reward: validatorRewards
+      };
+    }
+    return sum;
+  }, {});
+}
+
+function buildGrantData(grants, grantee, granter, validators) {
+  const { claimGrant, stakeGrant } = parseGrants(grants, grantee, granter);
+  let grantValidators, maxTokens;
+  if (stakeGrant) {
+    const { allow_list, deny_list, max_tokens } = stakeGrant.authorization;
+    if (allow_list?.address) {
+      grantValidators = allow_list.address;
+    } else if (deny_list?.address) {
+      grantValidators = deny_list.address.includes('')
+        ? []
+        : Object.values(validators).map(el => el.address).filter(address => !deny_list.address.includes(address));
+    }
+    maxTokens = max_tokens;
+  }
+  return {
+    claimGrant,
+    stakeGrant,
+    validators: grantValidators,
+    maxTokens: maxTokens ? bignumber(maxTokens.amount) : null
+  };
+}
+
+function resolveOperatorGrants(operators, operatorGrants, rewards, denom, defaultGrant) {
+  if (!operatorGrants) return {};
+  return operators.reduce((sum, operator) => {
+    const grant = operatorGrants[operator.botAddress] || defaultGrant;
+    sum[operator.botAddress] = {
+      ...grant,
+      grantsValid: !!(
+        grant.stakeGrant &&
+        (!grant.validators || grant.validators.includes(operator.address)) &&
+        (grant.maxTokens === null || larger(grant.maxTokens, rewardAmount(rewards?.[operator.address], denom)))
+      ),
+      grantsExist: !!(grant.claimGrant || grant.stakeGrant),
+    };
+    return sum;
+  }, {});
+}
+
+function sumRewardsForValidators(rewards, denom, validators) {
+  if (!rewards) return;
+
+  const total = Object.values(rewards).reduce((sum, item) => {
+    const reward = item.reward.find((el) => el.denom === denom);
+    if (reward && (validators === undefined || validators.includes(item.validator_address))) {
+      return add(sum, reward.amount);
+    }
+    return sum;
+  }, 0);
+  return {
+    amount: total,
+    denom: denom,
+  };
+}
 
 class Delegations extends React.Component {
   constructor(props) {
@@ -112,13 +189,7 @@ class Delegations extends React.Component {
     return this.restClient().getDelegations(address)
       .then(
         (delegations) => {
-          const orderedAddresses = Object.keys(this.props.validators)
-          delegations = orderedAddresses.reduce((sum, address) => {
-            if(delegations[address] && delegations[address].balance.amount !== '0'){
-              sum[address] = delegations[address]
-            }
-            return sum
-          }, {})
+          delegations = filterDelegationsByValidators(delegations, this.props.validators)
           if(address === this.props.address){
             this.setState({
               delegations: delegations,
@@ -150,16 +221,7 @@ class Delegations extends React.Component {
       .getRewards(this.props.address, this.props.network.denom)
       .then(
         (rewards) => {
-          this.setState({ rewards: rewards.reduce((sum, reward) => {
-            const validatorRewards = reward.reward.filter(reward => largerEq(reward.amount, 1))
-            if(validatorRewards.length > 0){
-              sum[reward.validator_address] = {
-                validator_address: reward.validator_address,
-                reward: validatorRewards
-              }
-            }
-            return sum
-          }, {}) });
+          this.setState({ rewards: reduceRewardsByValidator(rewards) });
         },
         (error) => {
           if ([404, 500].includes(error.response && error.response.status) && !this.state.rewards) {
@@ -212,23 +274,7 @@ class Delegations extends React.Component {
   }
 
   buildGrants(grants, grantee, granter){
-    const { claimGrant, stakeGrant } = parseGrants(grants, grantee, granter)
-    let grantValidators, maxTokens;
-    if (stakeGrant) {
-      const { allow_list, deny_list, max_tokens } = stakeGrant.authorization
-      if (allow_list?.address) {
-        grantValidators = allow_list.address
-      } else if (deny_list?.address) {
-        grantValidators = deny_list.address.includes('') ? [] : this.props.validators.map(el => el.address).filter(address => !deny_list.address.includes(address))
-      }
-      maxTokens = max_tokens
-    }
-    return {
-      claimGrant: claimGrant,
-      stakeGrant: stakeGrant,
-      validators: grantValidators,
-      maxTokens: maxTokens ? bignumber(maxTokens.amount) : null
-    };
+    return buildGrantData(grants, grantee, granter, this.props.validators);
   }
 
   isValidatorOperator(){
@@ -308,21 +354,13 @@ class Delegations extends React.Component {
   }
 
   operatorGrants() {
-    if (!this.state.operatorGrants) return {}
-    return this.props.operators.reduce((sum, operator) => {
-      let grant = this.state.operatorGrants[operator.botAddress]
-      if (!grant) grant = this.defaultGrant;
-      sum[operator.botAddress] = {
-        ...grant,
-        grantsValid: !!(
-          grant.stakeGrant &&
-          (!grant.validators || grant.validators.includes(operator.address)) &&
-          (grant.maxTokens === null || larger(grant.maxTokens, rewardAmount(this.state.rewards?.[operator.address], this.props.network.denom)))
-        ),
-        grantsExist: !!(grant.claimGrant || grant.stakeGrant),
-      }
-      return sum
-    }, {})
+    return resolveOperatorGrants(
+      this.props.operators,
+      this.state.operatorGrants,
+      this.state.rewards,
+      this.props.network.denom,
+      this.defaultGrant
+    );
   }
 
   restakePossible() {
@@ -330,20 +368,7 @@ class Delegations extends React.Component {
   }
 
   totalRewards(validators) {
-    if (!this.state.rewards) return;
-
-    const denom = this.props.network.denom;
-    const total = Object.values(this.state.rewards).reduce((sum, item) => {
-      const reward = item.reward.find((el) => el.denom === denom);
-      if (reward && (validators === undefined || validators.includes(item.validator_address))) {
-        return add(sum, reward.amount)
-      }
-      return sum;
-    }, 0);
-    return {
-      amount: total,
-      denom: denom,
-    };
+    return sumRewardsForValidators(this.state.rewards, this.props.network.denom, validators);
   }
 
   showValidatorModal(validator, opts) {

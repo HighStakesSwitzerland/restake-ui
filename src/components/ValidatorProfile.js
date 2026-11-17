@@ -19,6 +19,7 @@ import ValidatorNetworks from './ValidatorNetworks';
 import OperatorLastRestake from './OperatorLastRestake';
 import Address from './Address';
 import ValidatorStatus from './ValidatorStatus'
+import { sanitizeUrl } from '../utils/Helpers.mjs';
 
 function ValidatorProfile(props) {
   const { validator, operator, network, networks, registryData, lastExec } = props
@@ -190,8 +191,11 @@ function ValidatorProfile(props) {
                           {type.toUpperCase()}
                         </td>
                         <td className="list-group list-group-flush flex-fill">
-                          {nodes.map(api => {
-                            return <a href={api.address} target="_blank" className="text-reset text-decoration-underline">{api.address}</a>
+                          {nodes.map((api, index) => {
+                            const safeAddress = sanitizeUrl(api.address);
+                            return safeAddress
+                              ? <a key={index} href={safeAddress} target="_blank" rel="noopener noreferrer" className="text-reset text-decoration-underline">{api.address}</a>
+                              : <span key={index}>{api.address}</span>;
                           }).reduce((prev, curr) => [prev, <br />, curr])}
                         </td>
                       </tr>

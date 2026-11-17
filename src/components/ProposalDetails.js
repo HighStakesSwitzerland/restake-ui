@@ -26,7 +26,7 @@ function ProposalDetails(props) {
 
   const { proposal_id, title, description } = proposal
 
-  const fixDescription = description?.replace(/\\n/g, '  \n')
+  const fixDescription = typeof description === 'string' ? description.replace(/\\n/g, '  \n') : ''
 
   const transformHTMLString = (htmlString, isSpam) => {
     let transformedString = htmlString;
@@ -47,8 +47,8 @@ function ProposalDetails(props) {
   };
 
   const htmlDescription = micromark(fixDescription, { extensions: [gfm()], htmlExtensions: [gfmHtml()] })
-  const sanitizedHtml = DOMPurify.sanitize(htmlDescription);
-  const transformedDescription = transformHTMLString(sanitizedHtml, proposal.isSpam);
+  const transformedHtml = transformHTMLString(htmlDescription, proposal.isSpam);
+  const transformedDescription = DOMPurify.sanitize(transformedHtml);
 
   useEffect(() => {
     if(props.address !== props.wallet?.address && props.granters.includes(props.address)){

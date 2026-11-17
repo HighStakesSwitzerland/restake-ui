@@ -25,6 +25,61 @@ import REStakeStatus from './REStakeStatus';
 import AlertMessage from './AlertMessage';
 import { omit, sumCoins } from '../utils/Helpers.mjs';
 
+function sortValidatorsList(validators, { network, delegations, operators }) {
+  const sortedByDelegation = _.sortBy(validators, ({ operator_address: address }) => {
+    const delegation = delegations && delegations[address]
+    return 0 - (delegation?.balance?.amount || 0)
+  });
+  return _.sortBy(sortedByDelegation, ({ operator_address: address, public_nodes, path }) => {
+    if (network.ownerAddress === address) return -6
+    if (path === 'ecostake') return -5
+
+    const delegation = delegations && delegations[address]
+    const publicNodes = Object.entries(public_nodes || {}).length > 0
+    const operator = operators && operators.find(el => el.address === address)
+
+    let score = 1
+    if (delegation) {
+      score = operator ? -3 : -2
+    } else if (operator) {
+      score = -1
+    }
+    if (publicNodes) score--
+    return score
+  });
+}
+
+function filterAndGroupValidators({ validators, operators, delegations, network, exclude, filter }) {
+  const list = exclude
+    ? Object.values(omit(validators, ...exclude))
+    : Object.values(validators);
+
+  const { keywords, status, group } = filter;
+
+  let filtered = status
+    ? list.filter(result => {
+        if (status === 'active') return result.status === 'BOND_STATUS_BONDED';
+        if (status === 'inactive') return result.status !== 'BOND_STATUS_BONDED';
+        return true;
+      })
+    : list;
+
+  if (group === 'delegated') {
+    filtered = filtered.filter(({ operator_address: address }) => delegations && delegations[address]);
+  }
+
+  if (!keywords || keywords === '') {
+    return sortValidatorsList(filtered, { network, delegations, operators });
+  }
+
+  const searcher = new FuzzySearch(
+    filtered, ['description.moniker'],
+    { sort: true }
+  );
+
+  return searcher.search(keywords);
+}
+
 function Validators(props) {
   const { address, wallet, network, validators, operators, delegations, operatorGrants } = props
 
@@ -55,76 +110,19 @@ function Validators(props) {
     setResults(filtered)
   }, [validators, operators, delegations, operatorGrants, filter]);
 
-  function sortValidators(validators){
-    validators = _.sortBy(validators, ({ operator_address: address }) => {
-      const delegation = delegations && delegations[address]
-      return 0 - (delegation?.balance?.amount || 0)
-    });
-    return _.sortBy(validators, ({ operator_address: address, public_nodes, path }) => {
-      if(network.ownerAddress === address) return -6
-      if(path === 'ecostake') return -5
-
-      const delegation = delegations && delegations[address]
-      const publicNodes = Object.entries(public_nodes || {}).length > 0
-      const operator = operators && operators.find(el => el.address === address)
-
-      let score = 1
-      if (delegation) {
-        score = operator ? -3 : -2
-      } else if(operator){
-        score = -1
-      }
-      if(publicNodes) score--
-      return score
-    });
-  }
-
   function filterValidators(event){
     setFilter({keywords: event.target.value})
   }
 
   function filteredValidators(validators, filter){
-    let searchResults
-    if (props.exclude){
-      searchResults = Object.values(omit(validators, ...props.exclude))
-    }else{
-      searchResults = Object.values(validators)
-    }
-    const { keywords, status, group } = filter
-
-    if(status){
-      searchResults = searchResults.filter(result => {
-        if (status === 'active') {
-          return result.status === 'BOND_STATUS_BONDED'
-        } else if (status === 'inactive') {
-          return result.status !== 'BOND_STATUS_BONDED'
-        } else {
-          return true
-        }
-      })
-    }
-
-    searchResults = filterByGroup(searchResults, group)
-
-    if (!keywords || keywords === '') return sortValidators(searchResults)
-
-    const searcher = new FuzzySearch(
-      searchResults, ['description.moniker'],
-      { sort: true }
-    )
-
-    return searcher.search(keywords)
-  }
-
-  function filterByGroup(validators, group){
-    switch (group) {
-      case 'delegated':
-        validators = validators.filter(({operator_address: address}) => {
-          return delegations && delegations[address]
-        })
-        break;
-    }
-    return validators
+    return filterAndGroupValidators({
+      validators,
+      operators,
+      delegations,
+      network,
+      exclude: props.exclude,
+      filter
+    });
   }
 
   function operatorForValidator(validatorAddress) {

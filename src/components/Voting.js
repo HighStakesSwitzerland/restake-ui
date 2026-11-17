@@ -229,7 +229,7 @@ function Voting(props) {
         if (votes[proposal_id] && !clearExisting) return
 
         return network.restClient.getProposalVote(proposal_id, address, {
-          'axios-retry': { retryCondition: (e) => e.response.status !== 400 }
+          'axios-retry': { retryCondition: (e) => e.response?.status !== 400 }
         }
         ).then(result => {
           return setVotes({ [proposal_id]: Vote(result.vote) })

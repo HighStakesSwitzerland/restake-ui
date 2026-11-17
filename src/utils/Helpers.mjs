@@ -1,7 +1,36 @@
 import _ from 'lodash'
 import { format, floor, bignumber, add, multiply, divide, numeric, pow } from 'mathjs'
 import truncateMiddle from 'truncate-middle'
+import { fromBech32 } from '@cosmjs/encoding'
 import { MsgExec } from '../messages/MsgExec.mjs';
+
+export function sanitizeUrl(url, { defaultHttps = false } = {}) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  const candidate = defaultHttps && !/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)
+    ? `https://${trimmed}`
+    : trimmed;
+  try {
+    const parsed = new URL(candidate);
+    if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname) {
+      return parsed.href;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function isValidBech32Address(address, expectedPrefix) {
+  if (!address || typeof address !== 'string') return false;
+  try {
+    const { prefix, data } = fromBech32(address.trim());
+    return Boolean(data && data.length > 0 && (!expectedPrefix || prefix === expectedPrefix));
+  } catch {
+    return false;
+  }
+}
 
 export function timeStamp(...args) {
   console.log('[' + new Date().toISOString().substring(11, 23) + ']', ...args);

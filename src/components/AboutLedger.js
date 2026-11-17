@@ -4,6 +4,7 @@ import {
 } from 'react-bootstrap'
 
 import { useSearchParams } from 'react-router-dom'
+import { sanitizeUrl } from '../utils/Helpers.mjs'
 
 function AboutLedger(props) {
   let [searchParams, setSearchParams] = useSearchParams();
@@ -12,6 +13,7 @@ function AboutLedger(props) {
   const { network, validator } = props
   const { daemon_name, chain_id, node_home, codebase } = network.chain
   const { git_repo, binaries } = codebase || {}
+  const safeGitRepo = sanitizeUrl(git_repo)
 
   const address = validator?.restake?.address || <kbd>GrantAddress</kbd>
 
@@ -45,8 +47,9 @@ function AboutLedger(props) {
             <p>The binary <strong>may not have been built with ledger support</strong> so you might still need the source method.</p>
             <p>
               {Object.entries(binaries).map(([key, item]) => {
+                const safeItem = sanitizeUrl(item)
                 return (
-                  <span key={key}><strong>{key}:</strong> <a href={item} target="_blank">{item}</a><br /></span>
+                  <span key={key}><strong>{key}:</strong> {safeItem ? <a href={safeItem} target="_blank" rel="noopener noreferrer">{item}</a> : item}<br /></span>
                 )
               })}</p>
             <h6>Alternative install from source</h6>
@@ -57,7 +60,7 @@ function AboutLedger(props) {
         git_repo
           ? (
             <>
-              <p>Clone and install the <code>{daemon_name || network.prettyName}</code> CLI client from <a href={git_repo} target="_blank">{git_repo}</a>. The standard Tendermint installation process is detailed below, but you might need to check the documentation for project specific install.</p>
+              <p>Clone and install the <code>{daemon_name || network.prettyName}</code> CLI client from {safeGitRepo ? <a href={safeGitRepo} target="_blank" rel="noopener noreferrer">{git_repo}</a> : git_repo}. The standard Tendermint installation process is detailed below, but you might need to check the documentation for project specific install.</p>
               <pre className="pre-scrollable text-wrap"><code>
                 <p>git clone {git_repo} restake_{network.name}</p>
                 <p>cd restake_{network.name}</p>

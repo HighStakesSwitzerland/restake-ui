@@ -13,7 +13,7 @@ function TooltipIcon(props) {
         placement={props.placement || 'top'}
         rootClose={props.rootClose}
         overlay={
-          <Tooltip id={`tooltip-${props.key}`}>
+          <Tooltip id={`tooltip-${props.identifier}`}>
             {props.tooltip || props.children}
           </Tooltip>
         }

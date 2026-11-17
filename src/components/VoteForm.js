@@ -21,13 +21,6 @@ function VoteForm(props) {
     'VOTE_OPTION_ABSTAIN': 'Abstain'
   }
 
-  const choiceIndices = {
-    'VOTE_OPTION_YES': 1,
-    'VOTE_OPTION_NO': 3,
-    'VOTE_OPTION_NO_WITH_VETO': 4,
-    'VOTE_OPTION_ABSTAIN': 2
-  }
-
   const [choice, setChoice] = useState(vote?.option)
   const [loading, setLoading] = useState()
 
